@@ -1,0 +1,15 @@
+# Сборка Lazarus / Free Pascal
+*.exe
+*.o
+*.ppu
+*.a
+*.compiled
+*.lps
+lib/
+backup/
+
+# Ресурс проекта: Lazarus пересобирает его из Checkers.lpi и Checkers.ico при каждой сборке
+Checkers.res
+
+# Python
+__pycache__/
