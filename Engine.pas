@@ -8,12 +8,11 @@ unit Engine;
   12 — чёрная дамка. Стороны: 1 — белые, 2 — чёрные.
 
   Уровень N — это перебор на N полных ходов (ход стороны и ответ соперника), то есть 2N
-  полуходов. Оценка — материал с бонусом за продвижение и подвижность.
+  полуходов: альфа-бета с таблицей транспозиций и доигрыванием взятий в листьях. Оценка —
+  материал с бонусом за продвижение, подвижность, охрану тыла и центр.
 
-  Два режима (выбираются при сборке):
-  - обычный — альфа-бета-отсечение и исправленные ошибки оригинала;
-  - ORIGINAL (ключ -dORIGINAL) — полный минимакс с ошибками оригинала, игра совпадает с
-    программой 2003 года ход в ход. Им пользуется сверка с оригиналом (verify/). }
+  Версия, которая играет ход в ход как программа 2003 года (полный перебор вместе с двумя
+  её ошибками), — в git под меткой original-2003. }
 
 {$mode delphi}{$H+}
 {$Q-}{$R-}
@@ -27,28 +26,9 @@ const
   MaxDepth = 10;   // уровней перебора
   MaxJumps = 12;   // прыжков в одном взятии
   Inf = 666666666;
-
-  { Повторять две ошибки оригинала, чтобы компьютер играл в точности как он.
-    1. В переборе за чёрных после простого хода чёрных ответный простой ход белых
-       проверяется на превращение по правилу чёрных (1-я горизонталь -> чёрная дамка).
-       В этих ветках белая шашка, дошедшая до 8-й горизонтали, остаётся шашкой, а белая
-       дамка, ушедшая на 1-ю, становится чёрной: компьютер за чёрных недооценивает
-       проведение белых в дамки.
-    2. Списки ходов вмещают по 40 ходов. Взятия сначала записываются все, включая
-       неполные серии дамки, и только потом лишние выбрасываются; в эндшпиле с дамками
-       сырых серий бывает больше 40, и запись уходит в соседний список — обычно в список
-       ответов уровнем выше, который в этот момент перебирается. Перебор тогда считает
-       не те ходы. Чтобы переполнение задевало те же списки, что в оригинале, все списки
-       лежат одним блоком в его порядке (TMoveArea).
-    False — исправленное поведение: превращение по правилам и списки на 400 ходов.
-    Ошибки повторяются только в режиме ORIGINAL; в обычном режиме ещё и перебор идёт
-    с альфа-бета-отсечением. }
-{$IFDEF ORIGINAL}
-  OriginalBugs = True;
-{$ELSE}
-  OriginalBugs = False;
-{$ENDIF}
-  ListCap = 40 * Ord(OriginalBugs) + 400 * Ord(not OriginalBugs);
+  { Ходов в одном списке, с большим запасом: взятия сначала записываются все, включая
+    неполные серии дамки, и только потом лишние выбрасываются. }
+  ListCap = 400;
 
 type
   TBoard = array[1..8, 1..8] of Integer;
@@ -76,51 +56,36 @@ type
   PSimpleList = ^TSimpleList;
   PIntList = ^TIntList;
 
-  { Все списки ходов одним блоком, в порядке оригинала (см. OriginalBugs). Сначала ходы
-    стороны, которая ходит сейчас (игрока или корня перебора), оценки ходов корня и
-    кандидаты на ход, затем списки по глубине перебора. }
-  TMoveArea = packed record
+  { Все списки ходов: ходы стороны, которая ходит сейчас (игрока или корня перебора), оценки
+    ходов корня и кандидаты на ход, затем списки по глубине перебора. }
+  TMoveArea = record
     CapB, CapW: TMoveList;
     SimB, SimW: TSimpleList;
     ValuesW, ValuesB: TIntList;
     Candidates: TIntList;
-    Reserved1: array[1..10] of Integer;
     CapCntDB, CapCntDW, SimCntDB, SimCntDW: array[1..MaxDepth] of Integer;
-    CapDB: array[1..MaxDepth] of TMoveList;
-    Reserved2: TBoard;
-    CapDW: array[1..MaxDepth] of TMoveList;
+    CapDB, CapDW: array[1..MaxDepth] of TMoveList;
     SimDB, SimDW: array[1..MaxDepth] of TSimpleList;
-    Reserved3: array[1..4096] of Integer;
   end;
 
 var
   Board: TBoard;
 
-  { Память перед доской. Испорченное переполнением взятие (см. OriginalBugs, п. 2) может
-    нести исходное поле с вертикалью -1; оригинал тогда читает и обнуляет ячейку перед
-    массивом доски. Здесь лежат те же значения, что там в оригинале: важно лишь, ноль это
-    или нет. }
-  OffBoard: array[-1..0, 1..8] of Integer;
   Closing: Boolean;     // окно закрывается: перебор прерывается
   StopSearch: Boolean;  // запрошена остановка перебора
   Poddavki: Integer;    // 1 — игра в поддавки
-  { Уровни по умолчанию: в режиме ORIGINAL — 3, как в программе 2003 года. }
-{$IFDEF ORIGINAL}
-  WhiteLevel: Integer = 3;
-  BlackLevel: Integer = 3;
-{$ELSE}
+  { Уровни по умолчанию. }
   WhiteLevel: Integer = 6;
   BlackLevel: Integer = 6;
-{$ENDIF}
 
   { Число ходов стороны, которая ходит сейчас (сами ходы — CapList, SimList). }
   CapCnt: array[1..2] of Integer;
   SimCnt: array[1..2] of Integer;
   Area: TMoveArea;
 
-  { Датчик случайных чисел Delphi: тот же ряд, что у оригинала. }
+  { Датчик случайных чисел Delphi 5: тот же ряд, что в программе 2003 года. }
   DRandSeed: LongWord;
-  FixedSeed: Boolean;  // без Randomize, для сверки партий с оригиналом
+  FixedSeed: Boolean;  // без Randomize: ряд случайных чисел с нуля, партии повторяются
 
   { Вызывается раз в IdleEvery узлов перебора: окно обрабатывает сообщения. }
   SearchIdle: procedure;
@@ -354,7 +319,7 @@ begin
 end;
 
 const
-  { Слагаемые оценки обычной игры — не поддавков и не режима ORIGINAL; веса подобраны
+  { Слагаемые оценки обычной игры, не поддавков; веса подобраны
     матчами (verify/match.py). EvBack — шашка на c1 или e1 (у чёрных d8 или f8): охраняет
     тыл, не пускает соперника в дамки. EvCenter — шашка в центре: c5, d4, e5, f4. }
   EvBack = 300;
@@ -416,7 +381,7 @@ begin
     W := -W;
     B := -B;
   end
-  else if not OriginalBugs then
+  else
   begin
     W := W + PW;
     B := B + PB;
@@ -433,8 +398,7 @@ const
   { Направления по диагоналям в порядке, в котором серии взятий попадают в список:
     влево-вниз, вправо-вверх, влево-вверх, вправо-вниз. Влево поля приземления дамки
     перебираются от дальнего к ближнему, вправо — от ближнего к дальнему. От порядка зависят
-    номера ходов, а значит, и случайный выбор среди равных (и в режиме Original — какие
-    списки задевает переполнение), поэтому он тот же, что в оригинале. }
+    номера ходов, а значит, и случайный выбор среди равных. }
   DirX: array[1..4] of Integer = (-1, 1, -1, 1);
   DirY: array[1..4] of Integer = (-1, 1, 1, -1);
 
@@ -716,22 +680,13 @@ begin
   end;
 end;
 
-{ Ячейка доски; вертикали -1 и 0 — память перед доской (OffBoard). }
-function CellPtr(X, Y: Integer): PInteger;
-begin
-  if X < 1 then
-    Result := @OffBoard[X, Y]
-  else
-    Result := @Board[X, Y];
-end;
-
 procedure ApplyCapture(Side: Integer; const M: TMove);
 var
   k: Integer;
 begin
-  Board[M.Path[M.Len].X, M.Path[M.Len].Y] := CellPtr(M.Path[0].X, M.Path[0].Y)^;
+  Board[M.Path[M.Len].X, M.Path[M.Len].Y] := Board[M.Path[0].X, M.Path[0].Y];
   if (M.Path[M.Len].X <> M.Path[0].X) or (M.Path[M.Len].Y <> M.Path[0].Y) then
-    CellPtr(M.Path[0].X, M.Path[0].Y)^ := 0;
+    Board[M.Path[0].X, M.Path[0].Y] := 0;
   for k := 1 to M.Len do
   begin
     Board[M.Caps[k].X, M.Caps[k].Y] := 0;
@@ -840,34 +795,16 @@ begin
   end;
 end;
 
-{ Оценка листа полного перебора: в режиме ORIGINAL — сразу, как в оригинале, иначе после
+{ Худший для Side результат по всем ответам соперника на уже сделанный ход; листья — после
   доигрывания взятий. }
-function LeafValue(Side: Integer): Integer;
-begin
-  if OriginalBugs then
-    Result := Eval(Side)
-  else
-    Result := QMax(Side, -Inf - 1, Inf + 1, 1);
-end;
-
-{ Худший для Side результат по всем ответам соперника на уже сделанный ход.
-  OriginalBug — повторить ошибку оригинала для ответа белых (см. OriginalBugs, п. 1). }
-function ReplyValue(Side, Depth: Integer; OriginalBug: Boolean): Integer;
+function ReplyValue(Side, Depth: Integer): Integer;
 var
   Opp, r, Saved, PRow, PKing: Integer;
   Save2: TBoard;
 begin
   Opp := 3 - Side;
-  if OriginalBug then
-  begin
-    PRow := 1;
-    PKing := 12;
-  end
-  else
-  begin
-    PRow := PromoRow(Opp);
-    PKing := Opp + 10;
-  end;
+  PRow := PromoRow(Opp);
+  PKing := Opp + 10;
   CaptureMoves(Opp, CapCntD(Opp, Depth)^, CapListD(Opp, Depth)^);
   Result := Inf;
   for r := 1 to CapCntD(Opp, Depth)^ do
@@ -875,7 +812,7 @@ begin
     CopyBoard(Save2, Board);
     ApplyCapture(Opp, CapListD(Opp, Depth)^[r]);
     if Depth = 1 then
-      Result := Min(Result, LeafValue(Side))
+      Result := Min(Result, QMax(Side, -Inf - 1, Inf + 1, 1))
     else
       Result := Min(Result, FullSearch(Side, Depth - 1));
     CopyBoard(Board, Save2);
@@ -895,7 +832,7 @@ begin
           Board[TX, TY] := Board[FX, FY];
         Board[FX, FY] := 0;
         if Depth = 1 then
-          Result := Min(Result, LeafValue(Side))
+          Result := Min(Result, QMax(Side, -Inf - 1, Inf + 1, 1))
         else
           Result := Min(Result, FullSearch(Side, Depth - 1));
         Board[FX, FY] := Saved;
@@ -904,8 +841,9 @@ begin
   end;
 end;
 
-{ Полный перебор, как в оригинале: лучшая для Side оценка на Depth полных ходов вперёд.
-  На корне (Depth = уровень стороны) оценки ходов сохраняются в RootValues[Side]. }
+{ Полный перебор без отсечений: лучшая для Side оценка на Depth полных ходов вперёд. Эталон
+  для проверки альфа-беты (verify/abcheck). На корне (Depth = уровень стороны) оценки ходов
+  сохраняются в RootValues[Side]. }
 function FullSearch(Side, Depth: Integer): Integer;
 var
   m, V: Integer;
@@ -922,7 +860,7 @@ begin
     begin
       CopyBoard(Save1, Board);
       ApplyCapture(Side, CapListD(Side, Depth)^[m]);
-      V := ReplyValue(Side, Depth, False);
+      V := ReplyValue(Side, Depth);
       if Depth = Level(Side) then
         Values[m] := V;
       Result := Max(Result, V);
@@ -937,7 +875,7 @@ begin
     begin
       CopyBoard(Save1, Board);
       ApplySimple(Side, SimListD(Side, Depth)^[m]);
-      V := ReplyValue(Side, Depth, OriginalBugs and (Side = 2));
+      V := ReplyValue(Side, Depth);
       if Depth = Level(Side) then
         Values[m] := V;
       Result := Max(Result, V);
@@ -1396,18 +1334,10 @@ end;
 function Search(Side, Depth: Integer): Integer;
 begin
   IdleLeft := 1;  // сообщения обрабатываются уже в корне
-  if OriginalBugs then
-    Result := FullSearch(Side, Depth)
-  else
-    Result := ABRoot(Side, Depth);
+  Result := ABRoot(Side, Depth);
 end;
 
 initialization
-  OffBoard[-1, 1] := -1;
-  OffBoard[-1, 5] := -1;
-  OffBoard[-1, 6] := -1;
-  OffBoard[-1, 7] := -1;
-  OffBoard[-1, 8] := 10;
   InitZobrist;
 
 end.

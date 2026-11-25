@@ -191,7 +191,7 @@ begin
   CloseFile(F);
 end;
 
-{ Для сверки с оригиналом: ходы корня перебора и их оценки. }
+{ Для журнала (/log): ходы корня перебора и их оценки. }
 procedure LogRoot(Side: Integer; IsCapture: Boolean; Count: Integer);
 var
   F: TextFile;
@@ -267,9 +267,6 @@ procedure DrawPiece(X, Y: Integer; const B: TBoard);
 var
   G: TGraphic;
 begin
-  // испорченное переполнением взятие может указывать за доску (Engine.OriginalBugs)
-  if X < 1 then
-    Exit;
   case B[X, Y] of
     1: G := Form1.WhiteFish.Picture.Graphic;
     11: G := Form1.WhiteFish2.Picture.Graphic;
@@ -404,14 +401,14 @@ begin
 end;
 
 { Ничья по правилам: позиция повторилась в третий раз при той же очереди хода или 15 ходов
-  подряд каждая сторона ходила только дамками, без взятий. В режиме ORIGINAL ничьих нет, как
-  в оригинале. Возвращает текст сообщения, '' — не ничья. }
+  подряд каждая сторона ходила только дамками, без взятий. Возвращает текст сообщения,
+  '' — не ничья. }
 function DrawReason: string;
 var
   k, n: Integer;
 begin
   Result := '';
-  if OriginalBugs or (MoveNo < 2) then
+  if MoveNo < 2 then
     Exit;
   n := 0;
   k := MoveNo;
@@ -841,12 +838,6 @@ begin
   AddDisabledGlyph(SpeedButton6);
   AddDisabledGlyph(SpeedButton7);
   AddDisabledGlyph(SpeedButton10);
-  // уровни 5-7 — только с альфа-бетой: полным перебором оригинала они идут минуты
-  for k := 5 to 7 do
-  begin
-    WhitePopup.Items[k - 1].Visible := not OriginalBugs;
-    BlackPopup.Items[k - 1].Visible := not OriginalBugs;
-  end;
   // галочка — на уровне по умолчанию из Engine
   for k := 1 to WhitePopup.Items.Count do
     WhitePopup.Items[k - 1].Checked := k = WhiteLevel;
