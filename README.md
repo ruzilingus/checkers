@@ -110,6 +110,12 @@ d4, e5, f4). Веса подобраны матчами; не помогли п�
 Ключи запуска: `/fixedseed` — без `Randomize` (ряд случайных чисел с нуля), `/log=<файл>` —
 запись позиций партии и оценок ходов корня.
 
+- `verify/regress.lpr` — сверка с эталоном для правок, которые не должны менять игру
+  (рефакторинг, ускорение): хэши сырых списков взятий на 200 000 позиций и оценок всех ходов
+  корня на 1000 позиций. Эталоны — `verify/regress_normal.txt` и `verify/regress_original.txt`;
+  прогон — 7 и 3 с. Подменённые ошибки ловятся: порядок полей дамки, вес центра, глубина записи
+  таблицы. Если правка меняет игру нарочно, эталон перезаписывается (`regress > эталон`) в том
+  же коммите.
 - `verify/abcheck.lpr` — альфа-бета против полного перебора на случайных позициях: лучшая
   оценка и набор равных лучших ходов. 3300 позиций, уровни 1–4, расхождений нет; подменённая
   ошибка (окно на корне без «− 1») ловится — 40 расхождений из 500.
@@ -132,8 +138,25 @@ d4, e5, f4). Веса подобраны матчами; не помогли п�
   при вчетверо меньшем времени хода. Охрана тыла против версии без неё: уровень 4 —
   56,4 % (1000 партий), уровень 5 — 54,7 % (800); центр поверх тыла: 53,5 % и 52,4 %.
 
-Нужны Python 3 и Pillow. Сборка проверок (папки `lib\engtest`, `lib\abtest`, `lib\player`
-должны существовать: компилятор их не создаёт):
+Нужны Python 3 и Pillow. Сборка проверок — из папки проекта: компилятор ищет `Engine.pas`
+сначала в текущей папке. Папки `lib\regress`, `lib\regress-original`, `lib\engtest`,
+`lib\abtest`, `lib\player` должны существовать: компилятор их не создаёт.
+
+```powershell
+C:\lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.exe -Mdelphi -O2 -Fu. -FUlib\regress -B verify\regress.lpr
+```
+
+```powershell
+C:\lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.exe -Mdelphi -O2 -dORIGINAL -Fu. -FUlib\regress-original -overify\regress_original.exe -B verify\regress.lpr
+```
+
+```powershell
+verify\regress.exe verify\regress_normal.txt
+```
+
+```powershell
+verify\regress_original.exe verify\regress_original.txt
+```
 
 ```powershell
 C:\lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.exe -Mdelphi -O2 -dORIGINAL -Fu. -FUlib\engtest -B verify\engtest.lpr

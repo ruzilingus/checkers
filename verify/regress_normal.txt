@@ -1,0 +1,12 @@
+mode normal
+caps 200000 positions: moves 966807, max raw 33, hash 0C7B0A0B1BD5682B
+search 1..100, levels 1-5: hash 29A8E8B3AF3C6686
+search 101..200, levels 1-5: hash 9B137EBE8A343429
+search 201..300, levels 1-5: hash C00CEE002A16AB1F
+search 301..400, levels 1-5: hash 67A276526D2ADA2C
+search 401..500, levels 1-5: hash 0C3322FD9317EDDF
+search 501..600, levels 1-5: hash 74FC40EA596F2D6A
+search 601..700, levels 1-5: hash 8CF40061E6021A39
+search 701..800, levels 1-5: hash EC9754FEDE7D14C8
+search 801..900, levels 1-5: hash 56D26FD3CD349003
+search 901..1000, levels 1-5: hash 9AF8F170148DB52D
