@@ -39,25 +39,20 @@ type
     OkButton: TSpeedButton;
     ManTemplate: TImage;
     KingTemplate: TImage;
-    TemplateBuffer: TImage;
     procedure RedBarChange(Sender: TObject);
     procedure RedUpDownClick(Sender: TObject; Button: TUDBtnType);
     procedure OkButtonClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure RedBarKeyPress(Sender: TObject; var Key: Char);
+  private
+    procedure Recolor(Template: TImage);
   public
     OkPressed: Boolean;
   end;
 
 var
   Form2: TForm2;
-  { Общие с Unit1 переменные пересчёта цвета: пиксель картинки, его каналы и цвет фона
-    картинки шашки (пиксель (1,1)), по которому отличаются точки фигуры от фона. }
-  PixColor: TColor;
-  PixR, PixG, PixB: Byte;
-  BaseR, BaseG, BaseB: Byte;
-  SavedR, SavedG, SavedB: Integer;
 
 const
   { Ключ настроек в HKCU: цвета (R, G, B) и звук (Sound). AppDataLow, а не Software\Checkers:
@@ -69,6 +64,7 @@ const
 
 function ReadSetting(const Name, Default: string): string;
 procedure WriteSetting(const Name, Value: string);
+function MirrorColor(C, Base: TColor): TColor;
 
 implementation
 
@@ -76,6 +72,20 @@ uses
   Unit1;
 
 {$R *.lfm}
+
+var
+  { Цвет фона картинок шашки и дамки по каналам — пиксель (1, 1) шаблона. Точка, у которой
+    красная составляющая как у фона, считается фоном и не перекрашивается. }
+  BaseR, BaseG, BaseB: Byte;
+  { Ползунки на момент открытия окна: закрытие без OK возвращает их. }
+  SavedR, SavedG, SavedB: Integer;
+
+{ Цвет чёрных для цвета белых C: отражение относительно цвета фона Base по каждому каналу. }
+function MirrorColor(C, Base: TColor): TColor;
+begin
+  Result := RGB(Byte(2 * GetRValue(Base) - GetRValue(C)), Byte(2 * GetGValue(Base) - GetGValue(C)),
+    Byte(2 * GetBValue(Base) - GetBValue(C)));
+end;
 
 { Настройка Name из SettingsKey, а если там её нет — из OldSettingsKey; нет нигде или это не
   строка — Default. }
@@ -125,27 +135,38 @@ end;
 
 { TForm2 }
 
-procedure TForm2.RedBarChange(Sender: TObject);
+{ Перекрашивает образцы WhitePreview и BlackPreview по шаблону Template: точки фигуры
+  сдвигаются от цвета фона множителями ползунков, у чёрных — отражение. Точки, где у шаблона
+  фон, в образцах не трогаются. }
+procedure TForm2.Recolor(Template: TImage);
 var
   X, Y: Integer;
+  C, Base: TColor;
+  PixR, PixG, PixB: Byte;
 begin
+  Base := RGB(BaseR, BaseG, BaseB);
   for X := 2 to WhitePreview.Width - 3 do
     for Y := 8 to WhitePreview.Height - 9 do
     begin
-      PixColor := ManTemplate.Canvas.Pixels[X, Y];
-      PixR := GetRValue(PixColor);
-      PixG := GetGValue(PixColor);
-      PixB := GetBValue(PixColor);
+      C := Template.Canvas.Pixels[X, Y];
+      PixR := GetRValue(C);
+      PixG := GetGValue(C);
+      PixB := GetBValue(C);
       if PixR <> BaseR then
       begin
         PixR := Byte(Round((PixR - BaseR) * (RedBar.Position / 10) + BaseR));
         PixG := Byte(Round((PixG - BaseG) * (GreenBar.Position / 10) + BaseG));
         PixB := Byte(Round((PixB - BaseB) * (BlueBar.Position / 10) + BaseB));
-        WhitePreview.Canvas.Pixels[X, Y] := RGB(PixR, PixG, PixB);
-        BlackPreview.Canvas.Pixels[X, Y] := RGB(Byte(2 * BaseR - PixR), Byte(2 * BaseG - PixG),
-          Byte(2 * BaseB - PixB));
+        C := RGB(PixR, PixG, PixB);
+        WhitePreview.Canvas.Pixels[X, Y] := C;
+        BlackPreview.Canvas.Pixels[X, Y] := MirrorColor(C, Base);
       end;
     end;
+end;
+
+procedure TForm2.RedBarChange(Sender: TObject);
+begin
+  Recolor(ManTemplate);
   RLabel.Caption := IntToStr(RedBar.Position);
   GLabel.Caption := IntToStr(GreenBar.Position);
   BLabel.Caption := IntToStr(BlueBar.Position);
@@ -163,8 +184,8 @@ begin
 end;
 
 { Кнопка OK: сохраняет множители и раздаёт основному окну перекрашенные шашки и дамки.
-  RedBarChange перекрашивает образцы по ManTemplate, поэтому на время перекраски дамки
-  шаблон шашки подменяется шаблоном дамки, а сам ждёт в TemplateBuffer. }
+  Дамка перекрашивается поверх образцов шашки: где у шаблона дамки фон, остаются точки
+  шашки. }
 procedure TForm2.OkButtonClick(Sender: TObject);
 begin
   WriteSetting('R', IntToStr(RedBar.Position));
@@ -172,38 +193,33 @@ begin
   WriteSetting('B', IntToStr(BlueBar.Position));
   Form1.WhiteFish.Picture := WhitePreview.Picture;
   Form1.BlackFish.Picture := BlackPreview.Picture;
-  TemplateBuffer.Picture := ManTemplate.Picture;
-  ManTemplate.Picture := KingTemplate.Picture;
-  RedBarChange(Sender);
+  Recolor(KingTemplate);
   Form1.WhiteFish2.Picture := WhitePreview.Picture;
   Form1.BlackFish2.Picture := BlackPreview.Picture;
-  KingTemplate.Picture := ManTemplate.Picture;
-  ManTemplate.Picture := TemplateBuffer.Picture;
   OkPressed := True;
   Close;
 end;
 
+{ Открытие окна (и подготовка цветов при запуске игры): фон, образцы исходных цветов —
+  белые как в шаблоне, чёрные отражением, — затем ползунки из настроек и образцы по ним. }
 procedure TForm2.FormShow(Sender: TObject);
 var
   X, Y: Integer;
+  C, Base: TColor;
 begin
-  SamplePanel.Color := ManTemplate.Canvas.Pixels[1, 1];
-  PixColor := ManTemplate.Canvas.Pixels[1, 1];
-  BaseR := GetRValue(PixColor);
-  BaseG := GetGValue(PixColor);
-  BaseB := GetBValue(PixColor);
+  Base := ManTemplate.Canvas.Pixels[1, 1];
+  SamplePanel.Color := Base;
+  BaseR := GetRValue(Base);
+  BaseG := GetGValue(Base);
+  BaseB := GetBValue(Base);
   WhiteOriginal.Picture := ManTemplate.Picture;
   BlackOriginal.Picture := ManTemplate.Picture;
   for X := 2 to WhitePreview.Width - 3 do
     for Y := 8 to WhitePreview.Height - 9 do
     begin
-      PixColor := ManTemplate.Canvas.Pixels[X, Y];
-      PixR := GetRValue(PixColor);
-      PixG := GetGValue(PixColor);
-      PixB := GetBValue(PixColor);
-      if PixR <> BaseR then
-        BlackOriginal.Canvas.Pixels[X, Y] := RGB(Byte(2 * BaseR - PixR), Byte(2 * BaseG - PixG),
-          Byte(2 * BaseB - PixB));
+      C := ManTemplate.Canvas.Pixels[X, Y];
+      if GetRValue(C) <> BaseR then
+        BlackOriginal.Canvas.Pixels[X, Y] := MirrorColor(C, Base);
     end;
   WhitePreview.Picture := WhiteOriginal.Picture;
   BlackPreview.Picture := BlackOriginal.Picture;

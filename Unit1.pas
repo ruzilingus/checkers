@@ -164,8 +164,9 @@ var
   Paths: array[1..2, 1..MaxJumps + 1] of TSq;
   BlinkX, BlinkY: Integer;
 
-  { Кадры мигания выбранной фигуры: от клетки (0) до фигуры (8). }
-  FrameB, FrameW, FrameB2, FrameW2: array[0..8] of TImage;
+  { Кадры мигания выбранной фигуры: [фигура, кадр], кадр — от клетки (0) до фигуры (8).
+    Заняты строки фигур 1, 2, 11, 12, остальные пусты. }
+  Frames: array[1..12, 0..8] of TImage;
   LetTop, LetBottom, DigLeft, DigRight: array[1..8] of TPanel;
 
   LogFileName: string; // /log=<файл> — запись позиций партии
@@ -319,19 +320,26 @@ begin
     end;
 end;
 
+{ Картинка фигуры по значению клетки; пустая клетка — nil. }
+function PieceImage(V: Integer): TImage;
+begin
+  case V of
+    1: Result := Form1.WhiteFish;
+    2: Result := Form1.BlackFish;
+    11: Result := Form1.WhiteFish2;
+    12: Result := Form1.BlackFish2;
+  else
+    Result := nil;
+  end;
+end;
+
 procedure DrawPiece(X, Y: Integer; const B: TBoard);
 var
-  G: TGraphic;
+  Img: TImage;
 begin
-  case B[X, Y] of
-    1: G := Form1.WhiteFish.Picture.Graphic;
-    11: G := Form1.WhiteFish2.Picture.Graphic;
-    2: G := Form1.BlackFish.Picture.Graphic;
-    12: G := Form1.BlackFish2.Picture.Graphic;
-  else
-    Exit;
-  end;
-  Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), G);
+  Img := PieceImage(B[X, Y]);
+  if Img <> nil then
+    Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), Img.Picture.Graphic);
 end;
 
 { Рисует фигуры позиции B поверх клеток. }
@@ -393,7 +401,7 @@ begin
   CW := RGB(R, G, Bl);
   if CW = Form1.StatusWhite.Color then
     Exit;
-  CB := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G), Byte(2 * GetBValue(C) - Bl));
+  CB := MirrorColor(CW, C);
   Form1.StatusWhite.Color := CW;
   Form1.StatusBlack.Color := CB;
   Fill(Form1.WhiteModeButton, 3, 3, CW);
@@ -766,52 +774,48 @@ begin
   FLastActiveForm := Screen.ActiveForm;
 end;
 
+{ Кадры мигания каждой фигуры: k-й кадр — тёмная клетка, на которой точки фигуры смешаны с
+  клеткой в доле k/8. Фон картинки — точки с красной составляющей как у её пикселя (1, 1):
+  туда перекраска в окне цветов не пишет, там всегда фон шаблона. Кадры пересоздаются после
+  каждой смены цветов: прежние освобождаются. }
 procedure TForm1.CreateBlinkFish;
+const
+  Pieces: array[1..4] of Integer = (2, 1, 12, 11);
 var
-  k, X, Y: Integer;
-  R0, G0, B0: Byte;
-
-  procedure Blend(Src, Dst: TImage);
-  begin
-    PixColor := Src.Canvas.Pixels[X, Y];
-    PixR := GetRValue(PixColor);
-    PixG := GetGValue(PixColor);
-    PixB := GetBValue(PixColor);
-    if PixR <> BaseR then
-    begin
-      PixColor := DarkSquare.Canvas.Pixels[X, Y];
-      R0 := GetRValue(PixColor);
-      G0 := GetGValue(PixColor);
-      B0 := GetBValue(PixColor);
-      Dst.Canvas.Pixels[X, Y] := RGB(Byte(Round(R0 + (PixR - R0) * k / 8)),
-        Byte(Round(G0 + (PixG - G0) * k / 8)), Byte(Round(B0 + (PixB - B0) * k / 8)));
-    end;
-  end;
-
+  p, V, k, X, Y: Integer;
+  Src, Dst: TImage;
+  C: TColor;
+  BgR, PixR, PixG, PixB, R0, G0, B0: Byte;
 begin
-  for k := 0 to 8 do
+  for p := 1 to 4 do
   begin
-    // кадры пересоздаются после каждой смены цветов: прежние освобождаются
-    FrameB[k].Free;
-    FrameW[k].Free;
-    FrameB2[k].Free;
-    FrameW2[k].Free;
-    FrameB[k] := TImage.Create(Self);
-    FrameW[k] := TImage.Create(Self);
-    FrameB2[k] := TImage.Create(Self);
-    FrameW2[k] := TImage.Create(Self);
-    FrameB[k].Picture := DarkSquare.Picture;
-    FrameW[k].Picture := DarkSquare.Picture;
-    FrameB2[k].Picture := DarkSquare.Picture;
-    FrameW2[k].Picture := DarkSquare.Picture;
-    for X := 2 to Form2.WhitePreview.Width - 3 do
-      for Y := 8 to Form2.WhitePreview.Height - 9 do
-      begin
-        Blend(BlackFish, FrameB[k]);
-        Blend(WhiteFish, FrameW[k]);
-        Blend(BlackFish2, FrameB2[k]);
-        Blend(WhiteFish2, FrameW2[k]);
-      end;
+    V := Pieces[p];
+    Src := PieceImage(V);
+    BgR := GetRValue(Src.Canvas.Pixels[1, 1]);
+    for k := 0 to 8 do
+    begin
+      Frames[V, k].Free;
+      Dst := TImage.Create(Self);
+      Frames[V, k] := Dst;
+      Dst.Picture := DarkSquare.Picture;
+      for X := 2 to Form2.WhitePreview.Width - 3 do
+        for Y := 8 to Form2.WhitePreview.Height - 9 do
+        begin
+          C := Src.Canvas.Pixels[X, Y];
+          PixR := GetRValue(C);
+          PixG := GetGValue(C);
+          PixB := GetBValue(C);
+          if PixR <> BgR then
+          begin
+            C := DarkSquare.Canvas.Pixels[X, Y];
+            R0 := GetRValue(C);
+            G0 := GetGValue(C);
+            B0 := GetBValue(C);
+            Dst.Canvas.Pixels[X, Y] := RGB(Byte(Round(R0 + (PixR - R0) * k / 8)),
+              Byte(Round(G0 + (PixG - G0) * k / 8)), Byte(Round(B0 + (PixB - B0) * k / 8)));
+          end;
+        end;
+    end;
   end;
 end;
 
@@ -1356,7 +1360,7 @@ end;
 { Мигание выбранной фигуры: 16 тактов от фигуры к клетке и обратно. }
 procedure TForm1.BlinkTimerTimer(Sender: TObject);
 var
-  Side, V, k, n: Integer;
+  Side, V, k: Integer;
   Frame: TImage;
 begin
   if Step > 1 then
@@ -1377,15 +1381,9 @@ begin
   end
   else
     V := Board[BlinkX, BlinkY];
-  n := Abs(8 - BlinkTimer.Tag);
-  case V of
-    1: Frame := FrameW[n];
-    2: Frame := FrameB[n];
-    11: Frame := FrameW2[n];
-    12: Frame := FrameB2[n];
-  else
-    Frame := nil;
-  end;
+  Frame := nil;
+  if (V >= 1) and (V <= 12) then
+    Frame := Frames[V, Abs(8 - BlinkTimer.Tag)];
   if Frame <> nil then
     BoardImage.Canvas.StretchDraw(SquareRect(BlinkX, BlinkY), Frame.Picture.Graphic);
   if BlinkTimer.Tag = 15 then
