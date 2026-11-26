@@ -804,8 +804,8 @@ begin
     FrameW[k].Picture := DarkSquare.Picture;
     FrameB2[k].Picture := DarkSquare.Picture;
     FrameW2[k].Picture := DarkSquare.Picture;
-    for X := 2 to Form2.Image2.Width - 3 do
-      for Y := 8 to Form2.Image2.Height - 9 do
+    for X := 2 to Form2.WhitePreview.Width - 3 do
+      for Y := 8 to Form2.WhitePreview.Height - 9 do
       begin
         Blend(BlackFish, FrameB[k]);
         Blend(WhiteFish, FrameW[k]);
@@ -851,7 +851,7 @@ begin
   WhiteModeButton.Glyph := BlackModeButton.Glyph;
   PoddavkiButton.Glyph := Smile2.Picture.Bitmap;
   Form2.FormShow(Sender);
-  Form2.SpeedButton5Click(Sender);
+  Form2.OkButtonClick(Sender);
   CreateBlinkFish;
   DrawBoard;
   NewBoard;
@@ -1128,7 +1128,7 @@ end;
 procedure TForm1.ColorsButtonClick(Sender: TObject);
 begin
   NoModeButton.Down := True;
-  Form2.Image4.Picture := BackImage.Picture;
+  Form2.BackImage.Picture := BackImage.Picture;
   Form2.ShowModal;
   DrawBoard;
   ShowBoard(Board);
@@ -1356,60 +1356,38 @@ end;
 { Мигание выбранной фигуры: 16 тактов от фигуры к клетке и обратно. }
 procedure TForm1.BlinkTimerTimer(Sender: TObject);
 var
-  L, T, V, k: Integer;
+  Side, V, k, n: Integer;
+  Frame: TImage;
 begin
-  if Flipped then
-  begin
-    L := (8 - BlinkX) * 50;
-    T := (BlinkY - 1) * 50;
-  end
-  else
-  begin
-    L := (BlinkX - 1) * 50;
-    T := (8 - BlinkY) * 50;
-  end;
   if Step > 1 then
   begin
-    // при взятии шашка, прошедшая последнюю горизонталь, мигает дамкой
-    if PauseTimer.Tag <> 1 then
-    begin
-      k := 1;
-      V := Board[Paths[1, 1].X, Paths[1, 1].Y];
-      while k < Step do
-        if Paths[1, k].Y = 8 then
-        begin
-          V := 11;
-          k := k + Step;
-        end
-        else
-          Inc(k);
-    end
+    // взятие набирается по полям, а на доске фигура до конца хода стоит на первом поле
+    // пути; шашка, побывавшая на горизонтали превращения раньше текущего поля, мигает дамкой
+    if PauseTimer.Tag = 1 then
+      Side := 2
     else
-    begin
-      k := 1;
-      V := Board[Paths[2, 1].X, Paths[2, 1].Y];
-      while k < Step do
-        if Paths[2, k].Y = 1 then
-        begin
-          V := 12;
-          k := k + Step;
-        end
-        else
-          Inc(k);
-    end;
+      Side := 1;
+    V := Board[Paths[Side, 1].X, Paths[Side, 1].Y];
+    for k := 1 to Step - 1 do
+      if Paths[Side, k].Y = PromoRow(Side) then
+      begin
+        V := Side + 10;
+        Break;
+      end;
   end
   else
     V := Board[BlinkX, BlinkY];
+  n := Abs(8 - BlinkTimer.Tag);
   case V of
-    1: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
-        FrameW[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
-    2: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
-        FrameB[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
-    11: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
-        FrameW2[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
-    12: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
-        FrameB2[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
+    1: Frame := FrameW[n];
+    2: Frame := FrameB[n];
+    11: Frame := FrameW2[n];
+    12: Frame := FrameB2[n];
+  else
+    Frame := nil;
   end;
+  if Frame <> nil then
+    BoardImage.Canvas.StretchDraw(SquareRect(BlinkX, BlinkY), Frame.Picture.Graphic);
   if BlinkTimer.Tag = 15 then
     BlinkTimer.Tag := 0
   else

@@ -21,28 +21,28 @@ type
     RedBar: TTrackBar;
     GreenBar: TTrackBar;
     BlueBar: TTrackBar;
-    Panel1: TPanel;
-    Image2: TImage;
-    Image3: TImage;
+    SamplePanel: TPanel;
+    WhitePreview: TImage;
+    BlackPreview: TImage;
     RLabel: TPanel;
     GLabel: TPanel;
     BLabel: TPanel;
-    Image4: TImage;
+    BackImage: TImage;
     RedUpDown: TUpDown;
     GreenUpDown: TUpDown;
     BlueUpDown: TUpDown;
-    Image5: TImage;
-    Image6: TImage;
-    Bevel1: TBevel;
-    Bevel2: TBevel;
-    Bevel8: TBevel;
-    SpeedButton5: TSpeedButton;
-    Image1: TImage;
-    Image7: TImage;
-    Image8: TImage;
+    BlackOriginal: TImage;
+    WhiteOriginal: TImage;
+    OriginalBevel: TBevel;
+    PreviewBevel: TBevel;
+    OkBevel: TBevel;
+    OkButton: TSpeedButton;
+    ManTemplate: TImage;
+    KingTemplate: TImage;
+    TemplateBuffer: TImage;
     procedure RedBarChange(Sender: TObject);
     procedure RedUpDownClick(Sender: TObject; Button: TUDBtnType);
-    procedure SpeedButton5Click(Sender: TObject);
+    procedure OkButtonClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure RedBarKeyPress(Sender: TObject; var Key: Char);
@@ -129,10 +129,10 @@ procedure TForm2.RedBarChange(Sender: TObject);
 var
   X, Y: Integer;
 begin
-  for X := 2 to Image2.Width - 3 do
-    for Y := 8 to Image2.Height - 9 do
+  for X := 2 to WhitePreview.Width - 3 do
+    for Y := 8 to WhitePreview.Height - 9 do
     begin
-      PixColor := Image1.Canvas.Pixels[X, Y];
+      PixColor := ManTemplate.Canvas.Pixels[X, Y];
       PixR := GetRValue(PixColor);
       PixG := GetGValue(PixColor);
       PixB := GetBValue(PixColor);
@@ -141,8 +141,8 @@ begin
         PixR := Byte(Round((PixR - BaseR) * (RedBar.Position / 10) + BaseR));
         PixG := Byte(Round((PixG - BaseG) * (GreenBar.Position / 10) + BaseG));
         PixB := Byte(Round((PixB - BaseB) * (BlueBar.Position / 10) + BaseB));
-        Image2.Canvas.Pixels[X, Y] := RGB(PixR, PixG, PixB);
-        Image3.Canvas.Pixels[X, Y] := RGB(Byte(2 * BaseR - PixR), Byte(2 * BaseG - PixG),
+        WhitePreview.Canvas.Pixels[X, Y] := RGB(PixR, PixG, PixB);
+        BlackPreview.Canvas.Pixels[X, Y] := RGB(Byte(2 * BaseR - PixR), Byte(2 * BaseG - PixG),
           Byte(2 * BaseB - PixB));
       end;
     end;
@@ -162,22 +162,23 @@ begin
   RedBarChange(Sender);
 end;
 
-{ Кнопка OK: сохраняет множители и раздаёт перекрашенные шашки (Image1) и дамки (Image7)
-  основному окну. }
-procedure TForm2.SpeedButton5Click(Sender: TObject);
+{ Кнопка OK: сохраняет множители и раздаёт основному окну перекрашенные шашки и дамки.
+  RedBarChange перекрашивает образцы по ManTemplate, поэтому на время перекраски дамки
+  шаблон шашки подменяется шаблоном дамки, а сам ждёт в TemplateBuffer. }
+procedure TForm2.OkButtonClick(Sender: TObject);
 begin
   WriteSetting('R', IntToStr(RedBar.Position));
   WriteSetting('G', IntToStr(GreenBar.Position));
   WriteSetting('B', IntToStr(BlueBar.Position));
-  Form1.WhiteFish.Picture := Image2.Picture;
-  Form1.BlackFish.Picture := Image3.Picture;
-  Image8.Picture := Image1.Picture;
-  Image1.Picture := Image7.Picture;
+  Form1.WhiteFish.Picture := WhitePreview.Picture;
+  Form1.BlackFish.Picture := BlackPreview.Picture;
+  TemplateBuffer.Picture := ManTemplate.Picture;
+  ManTemplate.Picture := KingTemplate.Picture;
   RedBarChange(Sender);
-  Form1.WhiteFish2.Picture := Image2.Picture;
-  Form1.BlackFish2.Picture := Image3.Picture;
-  Image7.Picture := Image1.Picture;
-  Image1.Picture := Image8.Picture;
+  Form1.WhiteFish2.Picture := WhitePreview.Picture;
+  Form1.BlackFish2.Picture := BlackPreview.Picture;
+  KingTemplate.Picture := ManTemplate.Picture;
+  ManTemplate.Picture := TemplateBuffer.Picture;
   OkPressed := True;
   Close;
 end;
@@ -186,26 +187,26 @@ procedure TForm2.FormShow(Sender: TObject);
 var
   X, Y: Integer;
 begin
-  Panel1.Color := Image1.Canvas.Pixels[1, 1];
-  PixColor := Image1.Canvas.Pixels[1, 1];
+  SamplePanel.Color := ManTemplate.Canvas.Pixels[1, 1];
+  PixColor := ManTemplate.Canvas.Pixels[1, 1];
   BaseR := GetRValue(PixColor);
   BaseG := GetGValue(PixColor);
   BaseB := GetBValue(PixColor);
-  Image6.Picture := Image1.Picture;
-  Image5.Picture := Image1.Picture;
-  for X := 2 to Image2.Width - 3 do
-    for Y := 8 to Image2.Height - 9 do
+  WhiteOriginal.Picture := ManTemplate.Picture;
+  BlackOriginal.Picture := ManTemplate.Picture;
+  for X := 2 to WhitePreview.Width - 3 do
+    for Y := 8 to WhitePreview.Height - 9 do
     begin
-      PixColor := Image1.Canvas.Pixels[X, Y];
+      PixColor := ManTemplate.Canvas.Pixels[X, Y];
       PixR := GetRValue(PixColor);
       PixG := GetGValue(PixColor);
       PixB := GetBValue(PixColor);
       if PixR <> BaseR then
-        Image5.Canvas.Pixels[X, Y] := RGB(Byte(2 * BaseR - PixR), Byte(2 * BaseG - PixG),
+        BlackOriginal.Canvas.Pixels[X, Y] := RGB(Byte(2 * BaseR - PixR), Byte(2 * BaseG - PixG),
           Byte(2 * BaseB - PixB));
     end;
-  Image2.Picture := Image6.Picture;
-  Image3.Picture := Image5.Picture;
+  WhitePreview.Picture := WhiteOriginal.Picture;
+  BlackPreview.Picture := BlackOriginal.Picture;
   RedBar.Position := StrToIntDef(ReadSetting('R', '10'), 10);
   GreenBar.Position := StrToIntDef(ReadSetting('G', '10'), 10);
   BlueBar.Position := StrToIntDef(ReadSetting('B', '10'), 10);
@@ -244,7 +245,7 @@ begin
   if Key = #27 then
     Close;
   if Key = #13 then
-    SpeedButton5Click(Sender);
+    OkButtonClick(Sender);
 end;
 
 end.
