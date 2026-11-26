@@ -453,7 +453,7 @@ object MainForm: TMainForm
       }
       OnMouseDown = TitleImageMouseDown
     end
-    object Title: TLabel
+    object TitleLabel: TLabel
       Left = 24
       Top = 5
       Width = 41
@@ -951,7 +951,7 @@ object MainForm: TMainForm
         }
         Visible = False
       end
-      object Select: TImage
+      object SelectSquare: TImage
         Left = 120
         Top = 8
         Width = 50
@@ -1158,7 +1158,7 @@ object MainForm: TMainForm
         Align = alClient
         AutoSize = True
       end
-      object StatusBlack: TPanel
+      object BlackScoreBar: TPanel
         Left = 31
         Top = 8
         Width = 25
@@ -1169,9 +1169,9 @@ object MainForm: TMainForm
         ParentShowHint = False
         ShowHint = True
         TabOrder = 0
-        OnMouseDown = StatusBlackMouseDown
+        OnMouseDown = BlackScoreBarMouseDown
       end
-      object StatusWhite: TPanel
+      object WhiteScoreBar: TPanel
         Left = 6
         Top = 8
         Width = 25
@@ -1182,7 +1182,7 @@ object MainForm: TMainForm
         ParentShowHint = False
         ShowHint = True
         TabOrder = 1
-        OnMouseDown = StatusWhiteMouseDown
+        OnMouseDown = WhiteScoreBarMouseDown
       end
     end
   end
@@ -1219,32 +1219,32 @@ object MainForm: TMainForm
     Top = 306
     object WhiteLevel1: TMenuItem
       Caption = 'Уровень 1'
-      OnClick = OnWhiteItemClick
+      OnClick = WhiteLevelClick
     end
     object WhiteLevel2: TMenuItem
       Caption = 'Уровень 2'
-      OnClick = OnWhiteItemClick
+      OnClick = WhiteLevelClick
     end
     object WhiteLevel3: TMenuItem
       Caption = 'Уровень 3'
       Checked = True
-      OnClick = OnWhiteItemClick
+      OnClick = WhiteLevelClick
     end
     object WhiteLevel4: TMenuItem
       Caption = 'Уровень 4'
-      OnClick = OnWhiteItemClick
+      OnClick = WhiteLevelClick
     end
     object WhiteLevel5: TMenuItem
       Caption = 'Уровень 5'
-      OnClick = OnWhiteItemClick
+      OnClick = WhiteLevelClick
     end
     object WhiteLevel6: TMenuItem
       Caption = 'Уровень 6'
-      OnClick = OnWhiteItemClick
+      OnClick = WhiteLevelClick
     end
     object WhiteLevel7: TMenuItem
       Caption = 'Уровень 7'
-      OnClick = OnWhiteItemClick
+      OnClick = WhiteLevelClick
     end
   end
   object BlackPopup: TPopupMenu
@@ -1252,32 +1252,32 @@ object MainForm: TMainForm
     Top = 306
     object BlackLevel1: TMenuItem
       Caption = 'Уровень 1'
-      OnClick = OnBlackItemClick
+      OnClick = BlackLevelClick
     end
     object BlackLevel2: TMenuItem
       Caption = 'Уровень 2'
-      OnClick = OnBlackItemClick
+      OnClick = BlackLevelClick
     end
     object BlackLevel3: TMenuItem
       Caption = 'Уровень 3'
       Checked = True
-      OnClick = OnBlackItemClick
+      OnClick = BlackLevelClick
     end
     object BlackLevel4: TMenuItem
       Caption = 'Уровень 4'
-      OnClick = OnBlackItemClick
+      OnClick = BlackLevelClick
     end
     object BlackLevel5: TMenuItem
       Caption = 'Уровень 5'
-      OnClick = OnBlackItemClick
+      OnClick = BlackLevelClick
     end
     object BlackLevel6: TMenuItem
       Caption = 'Уровень 6'
-      OnClick = OnBlackItemClick
+      OnClick = BlackLevelClick
     end
     object BlackLevel7: TMenuItem
       Caption = 'Уровень 7'
-      OnClick = OnBlackItemClick
+      OnClick = BlackLevelClick
     end
   end
 end

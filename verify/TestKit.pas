@@ -1,6 +1,6 @@
 unit TestKit;
 
-{ Общее для проверок regress и abcheck: случайные позиции и число ходов корня. }
+{ Общее для проверок regress и abcheck: случайные позиции. }
 
 {$mode delphi}{$H+}
 {$Q-}{$R-}
@@ -15,7 +15,6 @@ var
 
 function Rnd(N: Integer): Integer;
 procedure RandomBoard(MaxPieces: Integer; Weird: Boolean);
-function RootCount(Side, Depth: Integer): Integer;
 
 implementation
 
@@ -79,16 +78,6 @@ begin
         Board[DX[t], DY[t]] := 10;
       Inc(t);
     end;
-end;
-
-{ Число ходов корня после Search(Side, Depth) или FullSearch(Side, Depth): взятий, если они
-  есть, иначе простых. }
-function RootCount(Side, Depth: Integer): Integer;
-begin
-  if CapCntD[Side, Depth] > 0 then
-    Result := CapCntD[Side, Depth]
-  else
-    Result := SimCntD[Side, Depth];
 end;
 
 end.

@@ -95,7 +95,7 @@ begin
     RandomBoard(8, False);
     Side := Rnd(2) + 1;
     Lv := Rnd(MaxLevel) + 1;
-    Poddavki := Ord(Rnd(4) = 0);
+    Poddavki := Rnd(4) = 0;
     WhiteLevel := Lv;
     BlackLevel := Lv;
     Best := Search(Side, Lv);
@@ -110,7 +110,7 @@ begin
       H := FnvBasis;
     end;
   end;
-  Poddavki := 0;
+  Poddavki := False;
   Lines.Add(Format('# search %.1f s', [Now_ - t]));
 end;
 

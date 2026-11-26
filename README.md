@@ -139,7 +139,7 @@ e1 (у чёрных d8 или f8): она охраняет тыл; +100 шашк
 
 Для `match.py`, `gui_play.py` и `scenario_play.py` нужен Python 3 и собранный `verify\player.exe`. Сборка проверок — из папки проекта: компилятор ищет
 `Engine.pas` сначала в текущей папке, а `verify/TestKit.pas` (общее для `regress` и `abcheck`:
-случайные позиции, число ходов корня) — рядом с программой. Папки `lib\regress`, `lib\abtest`, `lib\player` должны
+случайные позиции) — рядом с программой. Папки `lib\regress`, `lib\abtest`, `lib\player` должны
 существовать: компилятор их не создаёт.
 
 ```powershell

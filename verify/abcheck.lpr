@@ -26,7 +26,7 @@ begin
     RandomBoard(8, False);
     Side := Rnd(2) + 1;
     Lv := Rnd(MaxLv) + 1;
-    Poddavki := Ord(Rnd(4) = 0);
+    Poddavki := Rnd(4) = 0;
     WhiteLevel := Lv;
     BlackLevel := Lv;
     Saved := Board;
@@ -45,7 +45,7 @@ begin
     if not Same then
     begin
       Inc(Bad);
-      WriteLn('MISMATCH case ', c, ': side ', Side, ' level ', Lv, ' poddavki ', Poddavki,
+      WriteLn('MISMATCH case ', c, ': side ', Side, ' level ', Lv, ' poddavki ', Ord(Poddavki),
         ' full ', BestF, ' ab ', BestA, ' moves ', n1, '/', n2);
     end;
   end;

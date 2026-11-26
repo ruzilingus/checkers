@@ -24,9 +24,9 @@ type
     SamplePanel: TPanel;
     WhitePreview: TImage;
     BlackPreview: TImage;
-    RLabel: TPanel;
-    GLabel: TPanel;
-    BLabel: TPanel;
+    RedValue: TPanel;
+    GreenValue: TPanel;
+    BlueValue: TPanel;
     BackImage: TImage;
     RedUpDown: TUpDown;
     GreenUpDown: TUpDown;
@@ -39,17 +39,19 @@ type
     OkButton: TSpeedButton;
     ManTemplate: TImage;
     KingTemplate: TImage;
-    procedure RedBarChange(Sender: TObject);
-    procedure RedUpDownClick(Sender: TObject; Button: TUDBtnType);
+    procedure SliderChange(Sender: TObject);
+    procedure SliderStepClick(Sender: TObject; Button: TUDBtnType);
     procedure OkButtonClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
-    procedure RedBarKeyPress(Sender: TObject; var Key: Char);
+    procedure SliderKeyPress(Sender: TObject; var Key: Char);
   private
+    FOkPressed: Boolean;
     procedure Recolor(Template: TImage);
     procedure ShowSliderValues;
   public
-    OkPressed: Boolean;
+    { Окно закрыто кнопкой OK: цвета приняты. }
+    property OkPressed: Boolean read FOkPressed;
   end;
 
 var
@@ -168,26 +170,26 @@ end;
 { Подписи значений и стрелки ползунков — по их положению. }
 procedure TColorsForm.ShowSliderValues;
 begin
-  RLabel.Caption := IntToStr(RedBar.Position);
-  GLabel.Caption := IntToStr(GreenBar.Position);
-  BLabel.Caption := IntToStr(BlueBar.Position);
+  RedValue.Caption := IntToStr(RedBar.Position);
+  GreenValue.Caption := IntToStr(GreenBar.Position);
+  BlueValue.Caption := IntToStr(BlueBar.Position);
   RedUpDown.Position := RedBar.Position;
   GreenUpDown.Position := GreenBar.Position;
   BlueUpDown.Position := BlueBar.Position;
 end;
 
-procedure TColorsForm.RedBarChange(Sender: TObject);
+procedure TColorsForm.SliderChange(Sender: TObject);
 begin
   Recolor(ManTemplate);
   ShowSliderValues;
 end;
 
-procedure TColorsForm.RedUpDownClick(Sender: TObject; Button: TUDBtnType);
+procedure TColorsForm.SliderStepClick(Sender: TObject; Button: TUDBtnType);
 begin
   RedBar.Position := RedUpDown.Position;
   GreenBar.Position := GreenUpDown.Position;
   BlueBar.Position := BlueUpDown.Position;
-  RedBarChange(Sender);
+  SliderChange(Sender);
 end;
 
 { Кнопка OK: сохраняет множители и раздаёт основному окну перекрашенные шашки и дамки.
@@ -203,7 +205,7 @@ begin
   Recolor(KingTemplate);
   MainForm.WhiteKingFish.Picture := WhitePreview.Picture;
   MainForm.BlackKingFish.Picture := BlackPreview.Picture;
-  OkPressed := True;
+  FOkPressed := True;
   Close;
 end;
 
@@ -233,11 +235,11 @@ begin
   RedBar.Position := StrToIntDef(ReadSetting('R', '10'), 10);
   GreenBar.Position := StrToIntDef(ReadSetting('G', '10'), 10);
   BlueBar.Position := StrToIntDef(ReadSetting('B', '10'), 10);
-  RedBarChange(Sender);  // образцы, подписи и стрелки — по ползункам
+  SliderChange(Sender);  // образцы, подписи и стрелки — по ползункам
   SavedR := RedBar.Position;
   SavedG := GreenBar.Position;
   SavedB := BlueBar.Position;
-  OkPressed := False;
+  FOkPressed := False;
 end;
 
 { Закрытие без OK возвращает ползунки к значениям на момент открытия окна. }
@@ -252,7 +254,7 @@ begin
   end;
 end;
 
-procedure TColorsForm.RedBarKeyPress(Sender: TObject; var Key: Char);
+procedure TColorsForm.SliderKeyPress(Sender: TObject; var Key: Char);
 begin
   if Key = #27 then
     Close;

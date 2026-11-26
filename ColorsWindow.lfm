@@ -580,8 +580,8 @@ object ColorsForm: TColorsForm
     TabOrder = 0
     TickMarks = tmBoth
     TickStyle = tsNone
-    OnChange = RedBarChange
-    OnKeyPress = RedBarKeyPress
+    OnChange = SliderChange
+    OnKeyPress = SliderKeyPress
   end
   object GreenBar: TTrackBar
     Left = 61
@@ -597,8 +597,8 @@ object ColorsForm: TColorsForm
     TabOrder = 1
     TickMarks = tmBoth
     TickStyle = tsNone
-    OnChange = RedBarChange
-    OnKeyPress = RedBarKeyPress
+    OnChange = SliderChange
+    OnKeyPress = SliderKeyPress
   end
   object BlueBar: TTrackBar
     Left = 61
@@ -614,8 +614,8 @@ object ColorsForm: TColorsForm
     TabOrder = 2
     TickMarks = tmBoth
     TickStyle = tsNone
-    OnChange = RedBarChange
-    OnKeyPress = RedBarKeyPress
+    OnChange = SliderChange
+    OnKeyPress = SliderKeyPress
   end
   object SamplePanel: TPanel
     Left = 24
@@ -662,7 +662,7 @@ object ColorsForm: TColorsForm
       Shape = bsFrame
     end
   end
-  object RLabel: TPanel
+  object RedValue: TPanel
     Left = 24
     Top = 83
     Width = 33
@@ -678,7 +678,7 @@ object ColorsForm: TColorsForm
     ParentFont = False
     TabOrder = 4
   end
-  object GLabel: TPanel
+  object GreenValue: TPanel
     Left = 24
     Top = 108
     Width = 33
@@ -694,7 +694,7 @@ object ColorsForm: TColorsForm
     ParentFont = False
     TabOrder = 5
   end
-  object BLabel: TPanel
+  object BlueValue: TPanel
     Left = 24
     Top = 133
     Width = 33
@@ -721,7 +721,7 @@ object ColorsForm: TColorsForm
     Position = 10
     TabOrder = 7
     Wrap = False
-    OnClick = RedUpDownClick
+    OnClick = SliderStepClick
   end
   object GreenUpDown: TUpDown
     Left = 216
@@ -734,7 +734,7 @@ object ColorsForm: TColorsForm
     Position = 10
     TabOrder = 8
     Wrap = False
-    OnClick = RedUpDownClick
+    OnClick = SliderStepClick
   end
   object BlueUpDown: TUpDown
     Left = 216
@@ -747,6 +747,6 @@ object ColorsForm: TColorsForm
     Position = 10
     TabOrder = 9
     Wrap = False
-    OnClick = RedUpDownClick
+    OnClick = SliderStepClick
   end
 end

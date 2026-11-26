@@ -61,7 +61,7 @@ var
 
   Closing: Boolean;     // окно закрывается: перебор прерывается
   StopSearch: Boolean;  // запрошена остановка перебора
-  Poddavki: Integer;    // 1 — игра в поддавки
+  Poddavki: Boolean;    // игра в поддавки
   { Уровни по умолчанию. }
   WhiteLevel: Integer = 6;
   BlackLevel: Integer = 6;
@@ -73,10 +73,6 @@ var
   CapList: array[1..2] of TMoveList;
   SimList: array[1..2] of TSimpleList;
   RootValues: array[1..2] of TIntList;
-  { Ходы узлов перебора: [сторона, глубина]. }
-  CapCntD, SimCntD: array[1..2, 1..MaxDepth] of Integer;
-  CapListD: array[1..2, 1..MaxDepth] of TMoveList;
-  SimListD: array[1..2, 1..MaxDepth] of TSimpleList;
 
   { Датчик случайных чисел Delphi 5: тот же ряд, что в программе 2003 года. }
   DRandSeed: LongWord;
@@ -105,8 +101,15 @@ procedure UndoSimple(const M: TSimpleMove; Piece: Integer); inline;
 function Search(Side, Depth: Integer): Integer;
 function FullSearch(Side, Depth: Integer): Integer;
 function PickRootMove(Side, Count, Best: Integer): Integer;
+function RootCount(Side, Depth: Integer): Integer;
 
 implementation
+
+var
+  { Ходы узлов перебора: [сторона, глубина]. }
+  CapCntD, SimCntD: array[1..2, 1..MaxDepth] of Integer;
+  CapListD: array[1..2, 1..MaxDepth] of TMoveList;
+  SimListD: array[1..2, 1..MaxDepth] of TSimpleList;
 
 procedure DRandomize;
 var
@@ -300,7 +303,7 @@ var
   PW, PB: Integer;
 begin
   EvalParts(Bd, W, B, PW, PB);
-  if Poddavki = 1 then
+  if Poddavki then
   begin
     W := -W;
     B := -B;
@@ -314,7 +317,7 @@ var
   W, B, PW, PB: Integer;
 begin
   EvalParts(Board, W, B, PW, PB);
-  if Poddavki = 1 then
+  if Poddavki then
   begin
     W := -W;
     B := -B;
@@ -738,7 +741,7 @@ begin
   if CapCntD[Opp, Depth] = 0 then
   begin
     SimpleMoves(Opp, SimCntD[Opp, Depth], SimListD[Opp, Depth]);
-    if (SimCntD[Opp, Depth] = 0) and (Poddavki = 1) then
+    if (SimCntD[Opp, Depth] = 0) and Poddavki then
       Result := -Inf;
     for r := 1 to SimCntD[Opp, Depth] do
     begin
@@ -782,7 +785,7 @@ begin
   else
   begin
     SimpleMoves(Side, SimCntD[Side, Depth], SimListD[Side, Depth]);
-    if (SimCntD[Side, Depth] = 0) and (Poddavki = 1) then
+    if (SimCntD[Side, Depth] = 0) and Poddavki then
       Result := Inf;
     for m := 1 to SimCntD[Side, Depth] do
     begin
@@ -1095,7 +1098,7 @@ begin
   begin
     SimpleMoves(Mover, SimCntD[Mover, Depth], SimListD[Mover, Depth]);
     Count := SimCntD[Mover, Depth];
-    if (Count = 0) and (Poddavki = 1) then
+    if (Count = 0) and Poddavki then
       Result := Inf;  // в поддавках ходить нечем — выигрыш
     ScoreMoves(SimListD[Mover, Depth], Count, Mover, Reply, Depth, First);
     for m := 1 to Count do
@@ -1150,7 +1153,7 @@ begin
   begin
     SimpleMoves(Side, SimCntD[Side, Depth], SimListD[Side, Depth]);
     n := SimCntD[Side, Depth];
-    if (n = 0) and (Poddavki = 1) then
+    if (n = 0) and Poddavki then
       Result := Inf;
   end;
   if n = 0 then
@@ -1217,6 +1220,16 @@ begin
     Result := 1
   else
     Result := Cand[DRandom(n) + 1];
+end;
+
+{ Число ходов корня после Search(Side, Depth) или FullSearch(Side, Depth): взятий, если они
+  есть, иначе простых. Для проверок (verify/). }
+function RootCount(Side, Depth: Integer): Integer;
+begin
+  if CapCntD[Side, Depth] > 0 then
+    Result := CapCntD[Side, Depth]
+  else
+    Result := SimCntD[Side, Depth];
 end;
 
 initialization

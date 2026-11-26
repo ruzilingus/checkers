@@ -28,12 +28,12 @@ type
   { TMainForm }
 
   TMainForm = class(TForm)
-    Title: TLabel;
+    TitleLabel: TLabel;
     MainPanel: TPanel;
     BoardPanel: TPanel;
     ScorePanel: TPanel;
-    StatusBlack: TPanel;
-    StatusWhite: TPanel;
+    BlackScoreBar: TPanel;
+    WhiteScoreBar: TPanel;
     BackImage: TImage;
     TitleImage: TImage;
     IconImage: TImage;
@@ -42,7 +42,7 @@ type
     PoddavkiOffGlyph: TImage;
     LightSquare: TImage;
     DarkSquare: TImage;
-    Select: TImage;
+    SelectSquare: TImage;
     WhiteFish: TImage;
     BlackFish: TImage;
     WhiteKingFish: TImage;
@@ -110,23 +110,24 @@ type
     procedure PoddavkiButtonClick(Sender: TObject);
     procedure AboutButtonClick(Sender: TObject);
     procedure SoundButtonClick(Sender: TObject);
-    procedure StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
+    procedure BlackScoreBarMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure StatusWhiteMouseDown(Sender: TObject; Button: TMouseButton;
+    procedure WhiteScoreBarMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure WhiteTimerTimer(Sender: TObject);
     procedure BlackTimerTimer(Sender: TObject);
     procedure PauseTimerTimer(Sender: TObject);
     procedure BlinkTimerTimer(Sender: TObject);
-    procedure OnWhiteItemClick(Sender: TObject);
-    procedure OnBlackItemClick(Sender: TObject);
-    procedure CreateBlinkFish;
+    procedure WhiteLevelClick(Sender: TObject);
+    procedure BlackLevelClick(Sender: TObject);
+  private
+    { Картинка доски создаётся в FormCreate, её обработчики назначаются там же. }
+    BoardImage: TRuzilImage;
+    LastActiveForm: TCustomForm;
     procedure BoardImageMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure BoardImageMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-  private
-    BoardImage: TRuzilImage;
-    FLastActiveForm: TCustomForm;
+    procedure CreateBlinkFrames;
     procedure ActiveFormChanged(Sender: TObject);
     procedure ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
     procedure UndoMove(Sender: TObject);
@@ -407,11 +408,11 @@ begin
   G := Byte(Round(GetGValue(C) + G * (ColorsForm.GreenBar.Position / 10)));
   Bl := Byte(Round(GetBValue(C) + Bl * (ColorsForm.BlueBar.Position / 10)));
   CW := RGB(R, G, Bl);
-  if CW = MainForm.StatusWhite.Color then
+  if CW = MainForm.WhiteScoreBar.Color then
     Exit;
   CB := MirrorColor(CW, C);
-  MainForm.StatusWhite.Color := CW;
-  MainForm.StatusBlack.Color := CB;
+  MainForm.WhiteScoreBar.Color := CW;
+  MainForm.BlackScoreBar.Color := CB;
   Fill(MainForm.WhiteModeButton, 3, 3, CW);
   Fill(MainForm.BlackModeButton, 3, 3, CB);
   Auto := MainForm.AutoModeButton;
@@ -425,12 +426,12 @@ var
   SW, SB: Integer;
 begin
   SideScores(B, SW, SB);
-  MainForm.StatusWhite.Height := Round(Abs(SW) * 70.58823529411765 / EvalScale);
-  MainForm.StatusWhite.Top := MainForm.ScorePanel.Height - MainForm.StatusWhite.Height - 6;
-  MainForm.StatusBlack.Height := Round(Abs(SB) * 70.58823529411765 / EvalScale);
-  MainForm.StatusBlack.Top := MainForm.ScorePanel.Height - MainForm.StatusBlack.Height - 6;
-  MainForm.StatusWhite.Hint := FloatToStrF(SW / EvalScale, ffFixed, 10, 4);
-  MainForm.StatusBlack.Hint := FloatToStrF(SB / EvalScale, ffFixed, 10, 4);
+  MainForm.WhiteScoreBar.Height := Round(Abs(SW) * 70.58823529411765 / EvalScale);
+  MainForm.WhiteScoreBar.Top := MainForm.ScorePanel.Height - MainForm.WhiteScoreBar.Height - 6;
+  MainForm.BlackScoreBar.Height := Round(Abs(SB) * 70.58823529411765 / EvalScale);
+  MainForm.BlackScoreBar.Top := MainForm.ScorePanel.Height - MainForm.BlackScoreBar.Height - 6;
+  MainForm.WhiteScoreBar.Hint := FloatToStrF(SW / EvalScale, ffFixed, 10, 4);
+  MainForm.BlackScoreBar.Hint := FloatToStrF(SB / EvalScale, ffFixed, 10, 4);
   MainForm.ScorePanel.Repaint;
 end;
 
@@ -448,13 +449,13 @@ procedure MarkPath(X1, Y1, X2, Y2: Integer);
 var
   k, X, Y: Integer;
 begin
-  MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), MainForm.Select.Picture.Graphic);
+  MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), MainForm.SelectSquare.Picture.Graphic);
   DrawPiece(X1, Y1, Board);
   for k := 1 to Abs(X2 - X1) do
   begin
     X := Abs(X2 - X1) * k div (X2 - X1) + X1;
     Y := Abs(Y2 - Y1) * k div (Y2 - Y1) + Y1;
-    MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), MainForm.Select.Picture.Graphic);
+    MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), MainForm.SelectSquare.Picture.Graphic);
     DrawPiece(X, Y, Board);
   end;
 end;
@@ -845,16 +846,16 @@ begin
     (и при первом показе), но не при возврате из чужого приложения или окна сообщения. }
   if Screen.ActiveForm = nil then
     Exit;
-  if (Screen.ActiveForm = Self) and (FLastActiveForm <> Self) then
+  if (Screen.ActiveForm = Self) and (LastActiveForm <> Self) then
     FormActivate(Self);
-  FLastActiveForm := Screen.ActiveForm;
+  LastActiveForm := Screen.ActiveForm;
 end;
 
 { Кадры мигания каждой фигуры: k-й кадр — тёмная клетка, на которой точки фигуры смешаны с
   клеткой в доле k/8. Фон картинки — точки с красной составляющей как у её пикселя (1, 1):
   туда перекраска в окне цветов не пишет, там всегда фон шаблона. Кадры пересоздаются после
   каждой смены цветов: прежние освобождаются. }
-procedure TMainForm.CreateBlinkFish;
+procedure TMainForm.CreateBlinkFrames;
 const
   Pieces: array[1..4] of Integer = (2, 1, 12, 11);
 var
@@ -916,8 +917,8 @@ begin
         Byte(Round(G + (255 - G) * 0.65)), Byte(Round(B + (255 - B) * 0.65)));
       T := 1 - Power(Sqrt(Min(1.0, Sqr(Abs(X - 24.5) / 24.5) + Sqr(Abs(Y - 24.5) / 24.5))),
         1.01) / 2;
-      Select.Canvas.Pixels[X, Y] := RGB(Byte(Round(R + (255 - R) * T)), Byte(Round((1 - T) * G)),
-        Byte(Round((1 - T) * B)));
+      SelectSquare.Canvas.Pixels[X, Y] := RGB(Byte(Round(R + (255 - R) * T)),
+        Byte(Round((1 - T) * G)), Byte(Round((1 - T) * B)));
     end;
   for i := 1 to 12 do
     for j := 1 to 11 do
@@ -932,7 +933,7 @@ begin
   PoddavkiButton.Glyph := PoddavkiOffGlyph.Picture.Bitmap;
   ColorsForm.FormShow(Sender);
   ColorsForm.OkButtonClick(Sender);
-  CreateBlinkFish;
+  CreateBlinkFrames;
   DrawBoard;
   NewBoard;
   ShowBoard(Board);
@@ -1008,7 +1009,7 @@ begin
   end;
   Screen.Cursors[crTransparent] := LoadCursor(HInstance, 'TRANSPARENTCURSOR');
   Screen.Cursors[crEnabled] := LoadCursor(HInstance, 'ENABLEDCURSOR');
-  SetTransparentCursor([Title, StatusWhite, StatusBlack,
+  SetTransparentCursor([TitleLabel, WhiteScoreBar, BlackScoreBar,
     BlackModeButton, WhiteModeButton, AutoModeButton, NewGameButton, ColorsButton, FlipButton,
     AboutButton, CloseButton, PoddavkiButton, StopButton, SoundButton,
     AutoModeBevel, WhiteModeBevel, BlackModeBevel, StopBevel, AboutBevel, NewGameBevel,
@@ -1200,7 +1201,7 @@ begin
   ShowBoard(Board);
   MainForm.Repaint;
   if ColorsForm.OkPressed then
-    CreateBlinkFish;
+    CreateBlinkFrames;
 end;
 
 procedure TMainForm.FlipButtonClick(Sender: TObject);
@@ -1279,20 +1280,20 @@ end;
 procedure TMainForm.PoddavkiButtonClick(Sender: TObject);
 begin
   LastMover := 2;
-  if Poddavki = 1 then
+  if Poddavki then
   begin
-    Poddavki := 0;
+    Poddavki := False;
     PoddavkiButton.Hint := 'Поддавки Ctrl+G';
     Application.Title := 'Шашки';
-    Title.Caption := 'Шашки';
+    TitleLabel.Caption := 'Шашки';
     PoddavkiButton.Glyph := PoddavkiOffGlyph.Picture.Bitmap;
   end
-  else if Poddavki = 0 then
+  else
   begin
-    Poddavki := 1;
+    Poddavki := True;
     PoddavkiButton.Hint := 'Шашки Ctrl+G';
     Application.Title := 'Поддавки';
-    Title.Caption := 'Поддавки';
+    TitleLabel.Caption := 'Поддавки';
     PoddavkiButton.Glyph := PoddavkiOnGlyph.Picture.Bitmap;
   end;
   NewBoard;
@@ -1313,20 +1314,20 @@ begin
 end;
 
 { Ctrl + двойной щелчок правой кнопкой по полоске — меню уровня этой стороны. }
-procedure TMainForm.StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.BlackScoreBarMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if [ssCtrl, ssRight, ssDouble] <= Shift then
-    BlackPopup.Popup(MainForm.Left + ScorePanel.Left + StatusBlack.Left + X,
-      MainForm.Top + ScorePanel.Top + StatusBlack.Top + Y);
+    BlackPopup.Popup(MainForm.Left + ScorePanel.Left + BlackScoreBar.Left + X,
+      MainForm.Top + ScorePanel.Top + BlackScoreBar.Top + Y);
 end;
 
-procedure TMainForm.StatusWhiteMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.WhiteScoreBarMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if [ssCtrl, ssRight, ssDouble] <= Shift then
-    WhitePopup.Popup(MainForm.Left + ScorePanel.Left + StatusWhite.Left + X,
-      MainForm.Top + ScorePanel.Top + StatusWhite.Top + Y);
+    WhitePopup.Popup(MainForm.Left + ScorePanel.Left + WhiteScoreBar.Left + X,
+      MainForm.Top + ScorePanel.Top + WhiteScoreBar.Top + Y);
 end;
 
 { Ход компьютера за сторону Side в режиме Mode (человек играет другой стороной) или в игре
@@ -1341,7 +1342,7 @@ begin
   Other.Enabled := False;
   if not ComputerMove(Side) then
   begin
-    if Poddavki = 1 then
+    if Poddavki then
       EndGame('Вы проиграли!')
     else
       EndGame('Вы выиграли!');
@@ -1399,7 +1400,7 @@ begin
     CaptureMoves(Human, CapCnt[Human], CapList[Human]);
     SimpleMoves(Human, SimCnt[Human], SimList[Human]);
     if (SimCnt[Human] = 0) and (CapCnt[Human] = 0) then
-      if Poddavki = 1 then
+      if Poddavki then
         EndGame('Вы выиграли!')
       else
         EndGame('Вы проиграли!');
@@ -1461,12 +1462,12 @@ begin
     Popup.Items[i].Checked := i = Item.MenuIndex;
 end;
 
-procedure TMainForm.OnWhiteItemClick(Sender: TObject);
+procedure TMainForm.WhiteLevelClick(Sender: TObject);
 begin
   SelectLevel(WhitePopup, Sender as TMenuItem, WhiteLevel);
 end;
 
-procedure TMainForm.OnBlackItemClick(Sender: TObject);
+procedure TMainForm.BlackLevelClick(Sender: TObject);
 begin
   SelectLevel(BlackPopup, Sender as TMenuItem, BlackLevel);
 end;

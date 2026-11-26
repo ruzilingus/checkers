@@ -25,7 +25,7 @@ var
 begin
   WhiteLevel := Lv;
   BlackLevel := Lv;
-  Poddavki := 0;
+  Poddavki := False;
   StopSearch := False;
   Saved := Board;
   Best := Search(Side, Lv);
