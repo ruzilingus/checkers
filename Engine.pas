@@ -688,54 +688,27 @@ var
   QCnt: array[1..MaxQPly] of Integer;
   QList: array[1..MaxQPly] of TMoveList;
 
-function QReply(Side, Alpha, Beta, Ply: Integer): Integer; forward;
-
-{ Оценка листа для Side, когда ходит Side. }
-function QMax(Side, Alpha, Beta, Ply: Integer): Integer;
+{ Оценка листа для ходящей стороны Mover (negamax): лучшее для неё взятие, а позиция после
+  него оценивается для соперника — со знаком минус и перевёрнутым окном (-Beta, -Alpha). }
+function QSearch(Mover, Alpha, Beta, Ply: Integer): Integer;
 var
   m, V: Integer;
   Save: TBoard;
 begin
   if Ply > MaxQPly then
-    Exit(Eval(Side));
-  CaptureMoves(Side, QCnt[Ply], QList[Ply]);
+    Exit(Eval(Mover));
+  CaptureMoves(Mover, QCnt[Ply], QList[Ply]);
   if QCnt[Ply] = 0 then
-    Exit(Eval(Side));
+    Exit(Eval(Mover));
   Result := -Inf;
   for m := 1 to QCnt[Ply] do
   begin
     CopyBoard(Save, Board);
-    ApplyCapture(Side, QList[Ply][m]);
-    V := QReply(Side, Alpha, Beta, Ply + 1);
+    ApplyCapture(Mover, QList[Ply][m]);
+    V := -QSearch(3 - Mover, -Beta, -Alpha, Ply + 1);
     CopyBoard(Board, Save);
     Result := Max(Result, V);
     Alpha := Max(Alpha, Result);
-    if Alpha >= Beta then
-      Break;
-  end;
-end;
-
-{ Оценка листа для Side, когда ходит соперник. }
-function QReply(Side, Alpha, Beta, Ply: Integer): Integer;
-var
-  Opp, r, V: Integer;
-  Save: TBoard;
-begin
-  if Ply > MaxQPly then
-    Exit(Eval(Side));
-  Opp := 3 - Side;
-  CaptureMoves(Opp, QCnt[Ply], QList[Ply]);
-  if QCnt[Ply] = 0 then
-    Exit(Eval(Side));
-  Result := Inf;
-  for r := 1 to QCnt[Ply] do
-  begin
-    CopyBoard(Save, Board);
-    ApplyCapture(Opp, QList[Ply][r]);
-    V := QMax(Side, Alpha, Beta, Ply + 1);
-    CopyBoard(Board, Save);
-    Result := Min(Result, V);
-    Beta := Min(Beta, Result);
     if Alpha >= Beta then
       Break;
   end;
@@ -757,7 +730,7 @@ begin
     CopyBoard(Save2, Board);
     ApplyCapture(Opp, CapListD[Opp, Depth][r]);
     if Depth = 1 then
-      Result := Min(Result, QMax(Side, -Inf - 1, Inf + 1, 1))
+      Result := Min(Result, QSearch(Side, -Inf - 1, Inf + 1, 1))
     else
       Result := Min(Result, FullSearch(Side, Depth - 1));
     CopyBoard(Board, Save2);
@@ -773,7 +746,7 @@ begin
       Piece := Board[Mv.FX, Mv.FY];
       ApplySimple(Opp, Mv);
       if Depth = 1 then
-        Result := Min(Result, QMax(Side, -Inf - 1, Inf + 1, 1))
+        Result := Min(Result, QSearch(Side, -Inf - 1, Inf + 1, 1))
       else
         Result := Min(Result, FullSearch(Side, Depth - 1));
       UndoSimple(Mv, Piece);
@@ -1062,100 +1035,56 @@ begin
               History[s, a, b, c, d] := History[s, a, b, c, d] shr 1;
 end;
 
-function ABMax(Side, Depth, Alpha, Beta: Integer): Integer; forward;
-
-{ Худший для Side ответ соперника с отсечением по окну (Alpha, Beta). }
-function ABReply(Side, Depth, Alpha, Beta: Integer): Integer;
+{ Узел альфа-беты в форме negamax: оценка позиции для ходящей стороны Mover при окне
+  (Alpha, Beta). Позиция после хода оценивается для соперника — со знаком минус и окном
+  (-Beta, -Alpha), так что максимум и минимум считает одна функция. Reply — узел ответа
+  соперника стороне корня: после него глубина уменьшается, а на глубине 1 начинается
+  доигрывание взятий; у него свой ключ в таблице транспозиций (ZReply) и свои ходы-убийцы.
+  Окно опрашивается и перебор прерывается в узлах стороны корня. }
+function ABNode(Mover, Depth, Alpha, Beta: Integer; Reply: Boolean): Integer;
 var
-  Opp, r, Piece, V, Alpha0, Beta0: Integer;
-  Save2: TBoard;
+  m, Count, Piece, V, Alpha0, Beta0: Integer;
+  Save: TBoard;
   Key: QWord;
   First, Best, Mv: TSimpleMove;
-begin
-  Key := BoardKey xor ZReply;
-  if TTProbe(Key, Depth, Alpha, Beta, V, First) then
-    Exit(V);
-  Alpha0 := Alpha;
-  Beta0 := Beta;
-  Best.FX := 0;
-  Opp := 3 - Side;
-  CaptureMoves(Opp, CapCntD[Opp, Depth], CapListD[Opp, Depth]);
-  Result := Inf;
-  if CapCntD[Opp, Depth] > 0 then
+
+  { Оценка для Mover позиции после его хода. }
+  function Child: Integer;
   begin
-    for r := 1 to CapCntD[Opp, Depth] do
-    begin
-      CopyBoard(Save2, Board);
-      ApplyCapture(Opp, CapListD[Opp, Depth][r]);
-      if Depth = 1 then
-        V := QMax(Side, Alpha, Beta, 1)
-      else
-        V := ABMax(Side, Depth - 1, Alpha, Beta);
-      CopyBoard(Board, Save2);
-      Result := Min(Result, V);
-      Beta := Min(Beta, Result);
-      if Alpha >= Beta then
-        Break;
-    end;
-  end
-  else
-  begin
-    SimpleMoves(Opp, SimCntD[Opp, Depth], SimListD[Opp, Depth]);
-    if (SimCntD[Opp, Depth] = 0) and (Poddavki = 1) then
-      Result := -Inf;
-    ScoreMoves(SimListD[Opp, Depth], SimCntD[Opp, Depth], Opp, True, Depth, First);
-    for r := 1 to SimCntD[Opp, Depth] do
-    begin
-      PickMove(SimListD[Opp, Depth], True, Depth, r, SimCntD[Opp, Depth]);
-      Mv := SimListD[Opp, Depth][r];
-      Piece := Board[Mv.FX, Mv.FY];
-      ApplySimple(Opp, Mv);
-      if Depth = 1 then
-        V := QMax(Side, Alpha, Beta, 1)
-      else
-        V := ABMax(Side, Depth - 1, Alpha, Beta);
-      UndoSimple(Mv, Piece);
-      if (r = 1) or (V < Result) then
-        Best := Mv;
-      Result := Min(Result, V);
-      Beta := Min(Beta, Result);
-      if Alpha >= Beta then
-      begin
-        StoreCutoff(Mv, Opp, True, Depth);
-        Break;
-      end;
-    end;
+    if not Reply then
+      Result := -ABNode(3 - Mover, Depth, -Beta, -Alpha, True)
+    else if Depth = 1 then
+      Result := -QSearch(3 - Mover, -Beta, -Alpha, 1)
+    else
+      Result := -ABNode(3 - Mover, Depth - 1, -Beta, -Alpha, False);
   end;
-  TTStore(Key, Depth, Result, Alpha0, Beta0, Best);
-end;
 
-{ Лучший для Side ход с отсечением по окну (Alpha, Beta). }
-function ABMax(Side, Depth, Alpha, Beta: Integer): Integer;
-var
-  m, V, Piece, Alpha0, Beta0: Integer;
-  Save1: TBoard;
-  Key: QWord;
-  First, Best, Mv: TSimpleMove;
 begin
   Result := -Inf;
-  SearchPoll;
-  if Closing or StopSearch then
-    Exit;
+  if not Reply then
+  begin
+    SearchPoll;
+    if Closing or StopSearch then
+      Exit;
+  end;
   Key := BoardKey;
+  if Reply then
+    Key := Key xor ZReply;
   if TTProbe(Key, Depth, Alpha, Beta, V, First) then
     Exit(V);
   Alpha0 := Alpha;
   Beta0 := Beta;
   Best.FX := 0;
-  CaptureMoves(Side, CapCntD[Side, Depth], CapListD[Side, Depth]);
-  if CapCntD[Side, Depth] > 0 then
+  CaptureMoves(Mover, CapCntD[Mover, Depth], CapListD[Mover, Depth]);
+  Count := CapCntD[Mover, Depth];
+  if Count > 0 then
   begin
-    for m := 1 to CapCntD[Side, Depth] do
+    for m := 1 to Count do
     begin
-      CopyBoard(Save1, Board);
-      ApplyCapture(Side, CapListD[Side, Depth][m]);
-      V := ABReply(Side, Depth, Alpha, Beta);
-      CopyBoard(Board, Save1);
+      CopyBoard(Save, Board);
+      ApplyCapture(Mover, CapListD[Mover, Depth][m]);
+      V := Child;
+      CopyBoard(Board, Save);
       Result := Max(Result, V);
       Alpha := Max(Alpha, Result);
       if Alpha >= Beta then
@@ -1164,17 +1093,18 @@ begin
   end
   else
   begin
-    SimpleMoves(Side, SimCntD[Side, Depth], SimListD[Side, Depth]);
-    if (SimCntD[Side, Depth] = 0) and (Poddavki = 1) then
-      Result := Inf;
-    ScoreMoves(SimListD[Side, Depth], SimCntD[Side, Depth], Side, False, Depth, First);
-    for m := 1 to SimCntD[Side, Depth] do
+    SimpleMoves(Mover, SimCntD[Mover, Depth], SimListD[Mover, Depth]);
+    Count := SimCntD[Mover, Depth];
+    if (Count = 0) and (Poddavki = 1) then
+      Result := Inf;  // в поддавках ходить нечем — выигрыш
+    ScoreMoves(SimListD[Mover, Depth], Count, Mover, Reply, Depth, First);
+    for m := 1 to Count do
     begin
-      PickMove(SimListD[Side, Depth], False, Depth, m, SimCntD[Side, Depth]);
-      Mv := SimListD[Side, Depth][m];
+      PickMove(SimListD[Mover, Depth], Reply, Depth, m, Count);
+      Mv := SimListD[Mover, Depth][m];
       Piece := Board[Mv.FX, Mv.FY];
-      ApplySimple(Side, Mv);
-      V := ABReply(Side, Depth, Alpha, Beta);
+      ApplySimple(Mover, Mv);
+      V := Child;
       UndoSimple(Mv, Piece);
       if (m = 1) or (V > Result) then
         Best := Mv;
@@ -1182,7 +1112,7 @@ begin
       Alpha := Max(Alpha, Result);
       if Alpha >= Beta then
       begin
-        StoreCutoff(Mv, Side, False, Depth);
+        StoreCutoff(Mv, Mover, Reply, Depth);
         Break;
       end;
     end;
@@ -1254,7 +1184,7 @@ begin
         ApplyCapture(Side, CapListD[Side, Depth][m])
       else
         ApplySimple(Side, SimListD[Side, Depth][m]);
-      V := ABReply(Side, d, Result - 1, Inf + 1);
+      V := -ABNode(3 - Side, d, -Inf - 1, 1 - Result, True);
       Vals^[m] := V;
       Result := Max(Result, V);
       CopyBoard(Board, Save1);
