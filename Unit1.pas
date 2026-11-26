@@ -87,6 +87,8 @@ type
     BlackLevel6: TMenuItem;
     BlackLevel7: TMenuItem;
     SpeedButton7: TSpeedButton;
+    SoundBevel: TBevel;
+    SoundButton: TSpeedButton;
     procedure FormActivate(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormCreate(Sender: TObject);
@@ -107,6 +109,7 @@ type
       Shift: TShiftState; X, Y: Integer);
     procedure SpeedButton9Click(Sender: TObject);
     procedure SpeedButton7Click(Sender: TObject);
+    procedure SoundButtonClick(Sender: TObject);
     procedure StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure StatusWhiteMouseDown(Sender: TObject; Button: TMouseButton;
@@ -134,7 +137,7 @@ var
 implementation
 
 uses
-  Unit2;
+  Registry, Unit2;
 
 {$R *.lfm}
 {$R cursors.res}
@@ -164,6 +167,16 @@ var
   LetTop, LetBottom, DigLeft, DigRight: array[1..8] of TPanel;
 
   LogFileName: string; // /log=<файл> — запись позиций партии
+
+  { Звуковые сигналы: «ваш ход» и неверная клавиша. Включает и выключает SoundButton,
+    выбор хранится в реестре: SettingsKey, значение Sound. }
+  SoundOn: Boolean = True;
+
+const
+  { Ключ настроек в HKCU. AppDataLow, а не Software\Checkers: туда может писать и процесс с
+    низким уровнем целостности, а с ним запускается exe из папки с такой меткой (так на
+    машине разработки помечена C:\Projects). }
+  SettingsKey = '\Software\AppDataLow\Checkers';
 
 procedure IdleProcessMessages;
 begin
@@ -225,6 +238,96 @@ end;
 procedure ShowMsg(S: string);
 begin
   Application.MessageBox(PChar(S + #13 + #13), PChar(Application.Title), MB_OK);
+end;
+
+{ ---------- Звук ---------- }
+
+{ Звуковой сигнал, если звук включён. }
+procedure Signal;
+begin
+  if SoundOn then
+    Beep;
+end;
+
+{ Рисует на SoundButton динамик: с волнами — звук включён, перечёркнутый — выключен; в
+  подсказке — что сделает нажатие. }
+procedure ShowSound;
+var
+  G: TBitmap;
+begin
+  G := TBitmap.Create;
+  try
+    G.SetSize(18, 18);
+    with G.Canvas do
+    begin
+      Brush.Color := clAqua;  // цвет прозрачности, как у остальных значков кнопок
+      FillRect(0, 0, 18, 18);
+      Pen.Color := clMaroon;
+      Brush.Color := clMaroon;
+      Polygon([Point(2, 6), Point(5, 6), Point(9, 2), Point(9, 15), Point(5, 11),
+        Point(2, 11)]);
+      Brush.Style := bsClear;
+      if SoundOn then
+      begin
+        Arc(6, 5, 13, 12, 13, 12, 13, 5);
+        Arc(5, 2, 17, 15, 17, 15, 17, 2);
+      end
+      else
+      begin
+        Pen.Width := 2;
+        MoveTo(11, 6);
+        LineTo(16, 11);
+        MoveTo(16, 6);
+        LineTo(11, 11);
+      end;
+    end;
+    G.TransparentColor := clAqua;
+    G.Transparent := True;
+    Form1.SoundButton.Glyph := G;
+  finally
+    G.Free;
+  end;
+  if SoundOn then
+    Form1.SoundButton.Hint := 'Выключить звук Ctrl+M'
+  else
+    Form1.SoundButton.Hint := 'Включить звук Ctrl+M';
+end;
+
+{ Читает выбор звука из реестра (SettingsKey); нет записи — звук включён. }
+procedure LoadSound;
+var
+  R: TRegistry;
+begin
+  R := TRegistry.Create;
+  try
+    R.RootKey := HKEY_CURRENT_USER;
+    if R.OpenKeyReadOnly(SettingsKey) and R.ValueExists('Sound')
+      and (R.GetDataType('Sound') = rdString) then
+      SoundOn := R.ReadString('Sound') <> '0';
+  finally
+    R.Free;
+  end;
+end;
+
+{ Запоминает выбор звука в реестре. Не вышло — сообщение в отладочный вывод (DebugView):
+  окно об этом не беспокоит, звук переключается и так. }
+procedure SaveSound;
+var
+  R: TRegistry;
+begin
+  R := TRegistry.Create;
+  try
+    R.RootKey := HKEY_CURRENT_USER;
+    if R.OpenKey(SettingsKey, True) then
+      R.WriteString('Sound', IntToStr(Ord(SoundOn)))
+    else
+      {$push}{$warn 5044 off}  // LastError есть только у TRegistry под Windows
+      OutputDebugString(PChar(Format('Checkers: sound setting not saved, HKCU%s open error %d',
+        [SettingsKey, R.LastError])));
+      {$pop}
+  finally
+    R.Free;
+  end;
 end;
 
 procedure DrawBoard;
@@ -813,6 +916,8 @@ begin
     end
     else if SameText(Copy(ParamStr(k), 1, 5), '/log=') then
       LogFileName := Copy(ParamStr(k), 6, MaxInt);
+  LoadSound;
+  ShowSound;
 
   Image1 := TRuzilImage.Create(Self);
   Image1.Left := 1;
@@ -924,6 +1029,7 @@ begin
       Ord('O'): if SpeedButton6.Enabled then SpeedButton6Click(Sender);
       Ord('G'): if SpeedButton9.Enabled then SpeedButton9Click(Sender);
       Ord('S'): if SpeedButton10.Enabled then SpeedButton10Click(Sender);
+      Ord('M'): SoundButtonClick(Sender);
     end;
     Exit;
   end;
@@ -932,7 +1038,7 @@ begin
   if not SpeedButton2.Down and not SpeedButton1.Down
     and (InRange(Key, $41, $48) or InRange(Key, $61, $69) or InRange(Key, $31, $38)) then
   begin
-    Beep;
+    Signal;
     Exit;
   end;
   if InRange(Key, $41, $48) then
@@ -1141,6 +1247,13 @@ begin
   ShowMsg('         Р.Ш.Мухутдинов, ВМК, 2003 г.      ');
 end;
 
+procedure TForm1.SoundButtonClick(Sender: TObject);
+begin
+  SoundOn := not SoundOn;
+  ShowSound;
+  SaveSound;
+end;
+
 { Ctrl + двойной щелчок правой кнопкой по полоске — меню уровня этой стороны. }
 procedure TForm1.StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
@@ -1223,7 +1336,7 @@ begin
     Human := 0;
   if Human <> 0 then
   begin
-    Beep;
+    Signal;
     Step := 0;
     CaptureMoves(Human, CapCnt[Human], CapList[Human]);
     SimpleMoves(Human, SimCnt[Human], SimList[Human]);
