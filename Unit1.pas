@@ -4,8 +4,10 @@ unit Unit1;
   перебор — в модуле Engine. Компьютер среди ходов с лучшей оценкой выбирает случайный.
 
   Ходы игрока и компьютера идут через таймеры: Timer1 — ход компьютера за белых,
-  Timer2 — за чёрных, Timer3 — пауза после хода компьютера с подсвеченным путём.
-  Timer3.Tag хранит, кто ходил последним: 1 — белые (ходят чёрные), 2 — чёрные (ходят белые). }
+  Timer2 — за чёрных (оба — ComputerTurn), Timer3 — пауза после хода компьютера с
+  подсвеченным путём, затем ход человека или компьютера. Timer3.Tag хранит, кто ходил
+  последним: 1 — белые (ходят чёрные), 2 — чёрные (ходят белые). Сейчас ли ход человека —
+  HumanToMove; конец партии (проигрыш или ничья) — EndGame. }
 
 {$mode delphi}{$H+}
 {$Q-}{$R-}
@@ -123,6 +125,7 @@ type
     Image1: TRuzilImage;
     FLastActiveForm: TCustomForm;
     procedure ActiveFormChanged(Sender: TObject);
+    procedure ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
   end;
 
 var
@@ -431,23 +434,18 @@ begin
     Result := 'Ничья: 15 ходов только дамками, без взятий.';
 end;
 
-{ Ничья по правилам в идущей партии: в игре с человеком — сообщение, затем новая партия, как
-  после проигрыша. True — партия закончилась. }
-function CheckDraw: Boolean;
-var
-  Why: string;
+{ Конец партии: в игре с человеком — сообщение Msg, затем новая партия. Белыми начинает
+  компьютер, если играет ими, иначе ход за человеком. }
+procedure EndGame(const Msg: string);
 begin
-  Result := False;
   with Form1 do
   begin
-    if not (SpeedButton1.Down or SpeedButton2.Down or SpeedButton3.Down) then
-      Exit;
-    Why := DrawReason;
-    if Why = '' then
-      Exit;
-    Result := True;
     if SpeedButton1.Down or SpeedButton2.Down then
-      ShowMsg(Why);
+    begin
+      ShowMsg(Msg);
+      SpeedButton1.Enabled := True;
+      SpeedButton2.Enabled := True;
+    end;
     DrawBoard;
     NewBoard;
     ShowBoard(Board);
@@ -455,13 +453,41 @@ begin
     Step := 0;
     if SpeedButton2.Down then
     begin
-      // человек играет белыми и начинает
       CaptureMoves(1, CapCnt[1], CapList(1)^);
       SimpleMoves(1, SimCnt[1], SimList(1)^);
     end
     else
       Timer1.Enabled := True;
   end;
+end;
+
+{ Ничья по правилам в идущей партии — конец партии. True — партия закончилась. }
+function CheckDraw: Boolean;
+var
+  Why: string;
+begin
+  Result := False;
+  with Form1 do
+    if not (SpeedButton1.Down or SpeedButton2.Down or SpeedButton3.Down) then
+      Exit;
+  Why := DrawReason;
+  if Why = '' then
+    Exit;
+  EndGame(Why);
+  Result := True;
+end;
+
+{ Сторона, за которую человек может ходить сейчас: компьютер не думает и не показывает свой
+  ход; 0 — не ход человека. }
+function HumanToMove: Integer;
+begin
+  Result := 0;
+  with Form1 do
+    if not Timer1.Enabled and not Timer2.Enabled and not Timer3.Enabled then
+      if SpeedButton1.Down and (Timer3.Tag = 1) then
+        Result := 2
+      else if SpeedButton2.Down and (Timer3.Tag <> 1) then
+        Result := 1;
 end;
 
 { Ход компьютера за сторону Side. False — ходить нечем. }
@@ -489,7 +515,7 @@ begin
       Exit(False);
     LogRoot(Side, False, SimCnt[Side]);
     for i := 1 to SimCnt[Side] do
-      if Abs(RootValues(Side)^[i] - BestV) < 1E-7 then
+      if RootValues(Side)^[i] = BestV then
       begin
         Inc(n);
         Area.Candidates[n] := i;
@@ -503,7 +529,7 @@ begin
   begin
     LogRoot(Side, True, CapCnt[Side]);
     for i := 1 to CapCnt[Side] do
-      if Abs(RootValues(Side)^[i] - BestV) < 1E-7 then
+      if RootValues(Side)^[i] = BestV then
       begin
         Inc(n);
         Area.Candidates[n] := i;
@@ -701,6 +727,11 @@ var
 begin
   for k := 0 to 8 do
   begin
+    // кадры пересоздаются после каждой смены цветов: прежние освобождаются
+    FrameB[k].Free;
+    FrameW[k].Free;
+    FrameB2[k].Free;
+    FrameW2[k].Free;
     FrameB[k] := TImage.Create(Self);
     FrameW[k] := TImage.Create(Self);
     FrameB2[k] := TImage.Create(Self);
@@ -850,7 +881,7 @@ end;
 procedure TForm1.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   S: TShiftState;
-  Idx, Digit: Integer;
+  Idx, Digit, Side: Integer;
   Fin: Boolean;
 begin
   // в LCL Shift бывает дополнен состоянием Caps/NumLock — сравниваем как в Delphi
@@ -932,14 +963,9 @@ begin
   if InRange(Key, $31, $38) and (Form1.Tag <> 0) then
   begin
     Digit := Key - $30;
-    if (SpeedButton2.Down and not Timer1.Enabled and not Timer2.Enabled and not Timer3.Enabled
-      and (Timer3.Tag <> 1)
-      and (CheckStep(1, Form1.Tag - $41 + 1, Digit, Step, Idx, Fin)
-        or CheckStep(1, Form1.Tag - $41 + 1, Digit, 0, Idx, Fin)))
-      or (SpeedButton1.Down and not Timer1.Enabled and not Timer2.Enabled
-      and not Timer3.Enabled and (Timer3.Tag = 1)
-      and (CheckStep(2, Form1.Tag - $41 + 1, Digit, Step, Idx, Fin)
-        or CheckStep(2, Form1.Tag - $41 + 1, Digit, 0, Idx, Fin))) then
+    Side := HumanToMove;
+    if (Side <> 0) and (CheckStep(Side, Form1.Tag - $41 + 1, Digit, Step, Idx, Fin)
+      or CheckStep(Side, Form1.Tag - $41 + 1, Digit, 0, Idx, Fin)) then
     begin
       if Flipped then
         Image1MouseDown(Sender, mbLeft, [], (7 - (Form1.Tag - $41)) * 50 + 25,
@@ -1153,103 +1179,52 @@ begin
       Form1.Top + Panel3.Top + StatusWhite.Top + Y);
 end;
 
+{ Ход компьютера за сторону Side в режиме Mode (человек играет другой стороной) или в игре
+  с самим собой. Кнопка режима другой стороны (Other) на время раздумья недоступна. Ходить
+  нечем — конец партии; иначе пауза с подсвеченным путём (Timer3). }
+procedure TForm1.ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
+begin
+  if not (Mode.Down or SpeedButton3.Down) then
+    Exit;
+  if CheckDraw then
+    Exit;
+  Other.Enabled := False;
+  if not ComputerMove(Side) then
+  begin
+    if Poddavki = 1 then
+      EndGame('Вы проиграли!')
+    else
+      EndGame('Вы выиграли!');
+    Exit;
+  end;
+  if StopSearch then
+  begin
+    Other.Enabled := True;
+    StopSearch := False;
+    Exit;
+  end;
+  Timer3.Tag := Side;
+  Timer3.Enabled := True;
+end;
+
 { Ход компьютера за белых. }
 procedure TForm1.Timer1Timer(Sender: TObject);
 begin
   Timer1.Enabled := False;
-  if SpeedButton1.Down or SpeedButton3.Down then
-  begin
-    if CheckDraw then
-      Exit;
-    SpeedButton2.Enabled := False;
-    if not ComputerMove(1) then
-    begin
-      Timer3.Tag := 2;
-      if SpeedButton1.Down then
-      begin
-        if Poddavki = 1 then
-          ShowMsg('Вы проиграли!')
-        else
-          ShowMsg('Вы выиграли!');
-        DrawBoard;
-        NewBoard;
-        ShowBoard(Board);
-        SpeedButton1.Enabled := True;
-        SpeedButton2.Enabled := True;
-        Step := 0;
-        // так в оригинале: ходы белых пишутся в списки чёрных
-        CaptureMoves(1, CapCnt[2], CapList(2)^);
-        SimpleMoves(1, SimCnt[2], SimList(2)^);
-      end
-      else
-      begin
-        DrawBoard;
-        NewBoard;
-        ShowBoard(Board);
-      end;
-      Timer1.Enabled := True;
-      Exit;
-    end;
-    if StopSearch then
-    begin
-      SpeedButton2.Enabled := True;
-      StopSearch := False;
-      Exit;
-    end;
-    Timer3.Tag := 1;
-    Timer3.Enabled := True;
-  end;
+  ComputerTurn(1, SpeedButton1, SpeedButton2);
 end;
 
 { Ход компьютера за чёрных. }
 procedure TForm1.Timer2Timer(Sender: TObject);
 begin
   Timer2.Enabled := False;
-  if SpeedButton2.Down or SpeedButton3.Down then
-  begin
-    if CheckDraw then
-      Exit;
-    SpeedButton1.Enabled := False;
-    if not ComputerMove(2) then
-    begin
-      Timer3.Tag := 2;
-      if SpeedButton2.Down then
-      begin
-        if Poddavki = 1 then
-          ShowMsg('Вы проиграли!')
-        else
-          ShowMsg('Вы выиграли!');
-        DrawBoard;
-        NewBoard;
-        ShowBoard(Board);
-        SpeedButton1.Enabled := True;
-        SpeedButton2.Enabled := True;
-        Step := 0;
-        CaptureMoves(1, CapCnt[1], CapList(1)^);
-        SimpleMoves(1, SimCnt[1], SimList(1)^);
-      end
-      else
-      begin
-        DrawBoard;
-        NewBoard;
-        ShowBoard(Board);
-        Timer1.Enabled := True;
-      end;
-      Exit;
-    end;
-    if StopSearch then
-    begin
-      SpeedButton1.Enabled := True;
-      StopSearch := False;
-      Exit;
-    end;
-    Timer3.Tag := 2;
-    Timer3.Enabled := True;
-  end;
+  ComputerTurn(2, SpeedButton2, SpeedButton1);
 end;
 
 { Конец паузы после хода компьютера: снимает подсветку и передаёт ход. }
 procedure TForm1.Timer3Timer(Sender: TObject);
+var
+  Human: Integer;
 begin
   Timer3.Enabled := False;
   DrawBoard;
@@ -1262,43 +1237,22 @@ begin
   if CheckDraw then
     Exit;
   if SpeedButton1.Down then
+    Human := 2
+  else if SpeedButton2.Down then
+    Human := 1
+  else
+    Human := 0;
+  if Human <> 0 then
   begin
     Beep;
     Step := 0;
-    CaptureMoves(2, CapCnt[2], CapList(2)^);
-    SimpleMoves(2, SimCnt[2], SimList(2)^);
-    if (SimCnt[2] = 0) and (CapCnt[2] = 0) then
-    begin
+    CaptureMoves(Human, CapCnt[Human], CapList(Human)^);
+    SimpleMoves(Human, SimCnt[Human], SimList(Human)^);
+    if (SimCnt[Human] = 0) and (CapCnt[Human] = 0) then
       if Poddavki = 1 then
-        ShowMsg('Вы выиграли!')
+        EndGame('Вы выиграли!')
       else
-        ShowMsg('Вы проиграли!');
-      NewBoard;
-      DrawBoard;
-      ShowBoard(Board);
-      Timer3.Tag := 2;
-      Timer1.Enabled := True;
-    end;
-    Exit;
-  end;
-  if SpeedButton2.Down then
-  begin
-    Beep;
-    Step := 0;
-    CaptureMoves(1, CapCnt[1], CapList(1)^);
-    SimpleMoves(1, SimCnt[1], SimList(1)^);
-    if (SimCnt[1] = 0) and (CapCnt[1] = 0) then
-    begin
-      if Poddavki = 1 then
-        ShowMsg('Вы выиграли!')
-      else
-        ShowMsg('Вы проиграли!');
-      NewBoard;
-      DrawBoard;
-      ShowBoard(Board);
-      CaptureMoves(1, CapCnt[1], CapList(1)^);
-      SimpleMoves(1, SimCnt[1], SimList(1)^);
-    end;
+        EndGame('Вы проиграли!');
     Exit;
   end;
   if StopSearch then
@@ -1375,42 +1329,30 @@ begin
     BlinkTimer.Tag := BlinkTimer.Tag + 1;
 end;
 
-procedure TForm1.OnWhiteItemClick(Sender: TObject);
+{ Выбор уровня в меню стороны: уровень — номер пункта по порядку, галочка — только на нём. }
+procedure SelectLevel(Popup: TPopupMenu; Item: TMenuItem; var Level: Integer);
 var
-  Item: TMenuItem;
-  S: string;
   i: Integer;
 begin
-  Item := Sender as TMenuItem;
-  Item.Checked := True;
-  S := Item.Caption;
-  Delete(S, 1, Length(S) - 1);
-  WhiteLevel := StrToInt(S);
-  for i := 1 to WhitePopup.Items.Count do
-    if i <> WhiteLevel then
-      WhitePopup.Items[i - 1].Checked := False;
+  Level := Item.MenuIndex + 1;
+  for i := 0 to Popup.Items.Count - 1 do
+    Popup.Items[i].Checked := i = Item.MenuIndex;
+end;
+
+procedure TForm1.OnWhiteItemClick(Sender: TObject);
+begin
+  SelectLevel(WhitePopup, Sender as TMenuItem, WhiteLevel);
 end;
 
 procedure TForm1.OnBlackItemClick(Sender: TObject);
-var
-  Item: TMenuItem;
-  S: string;
-  i: Integer;
 begin
-  Item := Sender as TMenuItem;
-  Item.Checked := True;
-  S := Item.Caption;
-  Delete(S, 1, Length(S) - 1);
-  BlackLevel := StrToInt(S);
-  for i := 1 to BlackPopup.Items.Count do
-    if i <> BlackLevel then
-      BlackPopup.Items[i - 1].Checked := False;
+  SelectLevel(BlackPopup, Sender as TMenuItem, BlackLevel);
 end;
 
 { Подсветка координат под курсором и вид курсора: можно ли сходить на это поле. }
 procedure TForm1.Image1MouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var
-  CX, CY, k, Col, Row, Idx: Integer;
+  CX, CY, k, Col, Row, Idx, Side: Integer;
   Fin: Boolean;
 begin
   if Flipped then
@@ -1452,15 +1394,9 @@ begin
       DigRight[Row].Font.Color := LabelHotColor;
     end;
   end;
-  if SpeedButton1.Down and not Timer1.Enabled and not Timer2.Enabled and not Timer3.Enabled
-    and (Timer3.Tag = 1) then
-    if CheckStep(2, CX, CY, Step, Idx, Fin) or CheckStep(2, CX, CY, 0, Idx, Fin) then
-      Image1.Cursor := crEnabled
-    else
-      Image1.Cursor := crTransparent;
-  if SpeedButton2.Down and not Timer1.Enabled and not Timer2.Enabled and not Timer3.Enabled
-    and (Timer3.Tag <> 1) then
-    if CheckStep(1, CX, CY, Step, Idx, Fin) or CheckStep(1, CX, CY, 0, Idx, Fin) then
+  Side := HumanToMove;
+  if Side <> 0 then
+    if CheckStep(Side, CX, CY, Step, Idx, Fin) or CheckStep(Side, CX, CY, 0, Idx, Fin) then
       Image1.Cursor := crEnabled
     else
       Image1.Cursor := crTransparent;
@@ -1525,7 +1461,7 @@ procedure TForm1.Image1MouseDown(Sender: TObject; Button: TMouseButton;
   end;
 
 var
-  CX, CY: Integer;
+  CX, CY, Side: Integer;
 begin
   if Flipped then
   begin
@@ -1537,12 +1473,9 @@ begin
     CX := X div 50 + 1;
     CY := 8 - Y div 50;
   end;
-  if SpeedButton1.Down and not Timer1.Enabled and not Timer2.Enabled and not Timer3.Enabled
-    and (Timer3.Tag = 1) then
-    HumanClick(2, CX, CY);
-  if SpeedButton2.Down and not Timer1.Enabled and not Timer2.Enabled and not Timer3.Enabled
-    and (Timer3.Tag <> 1) then
-    HumanClick(1, CX, CY);
+  Side := HumanToMove;
+  if Side <> 0 then
+    HumanClick(Side, CX, CY);
 end;
 
 end.

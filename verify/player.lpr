@@ -3,7 +3,9 @@ program player;
 { Игрок для матча движков: читает команды из stdin, отвечает в stdout строкой.
   move <сторона> <уровень> <зерно> <доска> — ход компьютера, как ComputerMove в Unit1
     (перебор, равные лучшие, случайный среди них по зерну): «<доска после> <мс>» или «none <мс>»;
-  rand <сторона> <зерно> <доска> — случайный разрешённый ход (взятие обязательно): «<доска>» или «none».
+  rand <сторона> <зерно> <доска> — случайный разрешённый ход (взятие обязательно): «<доска>» или «none»;
+  list <сторона> <доска> — все разрешённые ходы с полями пути через пробел, поле — две цифры
+    (вертикаль, горизонталь), поля хода через «-»: «33-44 33-24» или «33-55-37»; нет ходов — пусто.
   Доска — 32 символа .wbWB, горизонтали 1..8, в каждой тёмные поля слева направо. }
 
 {$mode delphi}{$H+}
@@ -120,6 +122,36 @@ begin
   Result := True;
 end;
 
+{ Разрешённые ходы стороны в порядке генерации, см. команду list. }
+function ListMoves(Side: Integer): string;
+var
+  i, t: Integer;
+begin
+  Result := '';
+  CaptureMoves(Side, CapCnt[Side], CapList(Side)^);
+  if CapCnt[Side] > 0 then
+    for i := 1 to CapCnt[Side] do
+      with CapList(Side)^[i] do
+      begin
+        if Result <> '' then
+          Result := Result + ' ';
+        Result := Result + IntToStr(Path[0].X) + IntToStr(Path[0].Y);
+        for t := 1 to Len do
+          Result := Result + '-' + IntToStr(Path[t].X) + IntToStr(Path[t].Y);
+      end
+  else
+  begin
+    SimpleMoves(Side, SimCnt[Side], SimList(Side)^);
+    for i := 1 to SimCnt[Side] do
+      with SimList(Side)^[i] do
+      begin
+        if Result <> '' then
+          Result := Result + ' ';
+        Result := Result + IntToStr(FX) + IntToStr(FY) + '-' + IntToStr(TX) + IntToStr(TY);
+      end;
+  end;
+end;
+
 var
   Line: string;
   P: TStringArray;
@@ -152,6 +184,11 @@ begin
         WriteLn(GetBoard)
       else
         WriteLn('none');
+    end
+    else if (Length(P) >= 3) and (P[0] = 'list') then
+    begin
+      SetBoard(P[2]);
+      WriteLn(ListMoves(StrToInt(P[1])));
     end
     else
       WriteLn('error');
