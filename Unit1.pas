@@ -137,7 +137,7 @@ var
 implementation
 
 uses
-  Registry, Unit2;
+  Unit2;
 
 {$R *.lfm}
 {$R cursors.res}
@@ -169,14 +169,8 @@ var
   LogFileName: string; // /log=<файл> — запись позиций партии
 
   { Звуковые сигналы: «ваш ход» и неверная клавиша. Включает и выключает SoundButton,
-    выбор хранится в реестре: SettingsKey, значение Sound. }
+    выбор хранится в реестре: настройка Sound (см. SettingsKey в Unit2). }
   SoundOn: Boolean = True;
-
-const
-  { Ключ настроек в HKCU. AppDataLow, а не Software\Checkers: туда может писать и процесс с
-    низким уровнем целостности, а с ним запускается exe из папки с такой меткой (так на
-    машине разработки помечена C:\Projects). }
-  SettingsKey = '\Software\AppDataLow\Checkers';
 
 procedure IdleProcessMessages;
 begin
@@ -291,43 +285,6 @@ begin
     Form1.SoundButton.Hint := 'Выключить звук Ctrl+M'
   else
     Form1.SoundButton.Hint := 'Включить звук Ctrl+M';
-end;
-
-{ Читает выбор звука из реестра (SettingsKey); нет записи — звук включён. }
-procedure LoadSound;
-var
-  R: TRegistry;
-begin
-  R := TRegistry.Create;
-  try
-    R.RootKey := HKEY_CURRENT_USER;
-    if R.OpenKeyReadOnly(SettingsKey) and R.ValueExists('Sound')
-      and (R.GetDataType('Sound') = rdString) then
-      SoundOn := R.ReadString('Sound') <> '0';
-  finally
-    R.Free;
-  end;
-end;
-
-{ Запоминает выбор звука в реестре. Не вышло — сообщение в отладочный вывод (DebugView):
-  окно об этом не беспокоит, звук переключается и так. }
-procedure SaveSound;
-var
-  R: TRegistry;
-begin
-  R := TRegistry.Create;
-  try
-    R.RootKey := HKEY_CURRENT_USER;
-    if R.OpenKey(SettingsKey, True) then
-      R.WriteString('Sound', IntToStr(Ord(SoundOn)))
-    else
-      {$push}{$warn 5044 off}  // LastError есть только у TRegistry под Windows
-      OutputDebugString(PChar(Format('Checkers: sound setting not saved, HKCU%s open error %d',
-        [SettingsKey, R.LastError])));
-      {$pop}
-  finally
-    R.Free;
-  end;
 end;
 
 procedure DrawBoard;
@@ -916,7 +873,7 @@ begin
     end
     else if SameText(Copy(ParamStr(k), 1, 5), '/log=') then
       LogFileName := Copy(ParamStr(k), 6, MaxInt);
-  LoadSound;
+  SoundOn := ReadSetting('Sound', '1') <> '0';
   ShowSound;
 
   Image1 := TRuzilImage.Create(Self);
@@ -1251,7 +1208,7 @@ procedure TForm1.SoundButtonClick(Sender: TObject);
 begin
   SoundOn := not SoundOn;
   ShowSound;
-  SaveSound;
+  WriteSetting('Sound', IntToStr(Ord(SoundOn)));
 end;
 
 { Ctrl + двойной щелчок правой кнопкой по полоске — меню уровня этой стороны. }

@@ -2,7 +2,7 @@ unit Unit2;
 
 { Окно «Настройка цветов». Цвет белых шашек задаётся тремя ползунками (множители каналов
   от -10 до 10, по умолчанию 10 — исходный цвет картинки), чёрные получаются отражением
-  белых относительно цвета фона клетки. Значения хранятся в HKCU\Software\Checkers (R, G, B). }
+  белых относительно цвета фона клетки. Значения хранятся в реестре (R, G, B), см. SettingsKey. }
 
 {$mode delphi}{$H+}
 {$Q-}{$R-}
@@ -59,6 +59,17 @@ var
   BaseR, BaseG, BaseB: Byte;
   SavedR, SavedG, SavedB: Integer;
 
+const
+  { Ключ настроек в HKCU: цвета (R, G, B) и звук (Sound). AppDataLow, а не Software\Checkers:
+    туда может писать и процесс с низким уровнем целостности, а с ним запускается exe из папки
+    с такой меткой (на машине разработки так помечена C:\Projects). }
+  SettingsKey = '\Software\AppDataLow\Checkers';
+  { Прежний ключ цветов: читается, пока в SettingsKey значения нет. }
+  OldSettingsKey = '\Software\Checkers';
+
+function ReadSetting(const Name, Default: string): string;
+procedure WriteSetting(const Name, Value: string);
+
 implementation
 
 uses
@@ -66,8 +77,51 @@ uses
 
 {$R *.lfm}
 
+{ Настройка Name из SettingsKey, а если там её нет — из OldSettingsKey; нет нигде или это не
+  строка — Default. }
+function ReadSetting(const Name, Default: string): string;
+const
+  Keys: array[1..2] of string = (SettingsKey, OldSettingsKey);
 var
-  Reg: TRegIniFile;
+  R: TRegistry;
+  i: Integer;
+begin
+  Result := Default;
+  R := TRegistry.Create(KEY_READ);
+  try
+    R.RootKey := HKEY_CURRENT_USER;
+    for i := 1 to 2 do
+    begin
+      if R.OpenKeyReadOnly(Keys[i]) and R.ValueExists(Name)
+        and (R.GetDataType(Name) = rdString) then
+        Exit(R.ReadString(Name));
+      R.CloseKey;
+    end;
+  finally
+    R.Free;
+  end;
+end;
+
+{ Записывает настройку Name в SettingsKey. Не вышло — сообщение в отладочный вывод
+  (DebugView): окно об этом не беспокоит, настройка действует до выхода из игры. }
+procedure WriteSetting(const Name, Value: string);
+var
+  R: TRegistry;
+begin
+  R := TRegistry.Create;
+  try
+    R.RootKey := HKEY_CURRENT_USER;
+    if R.OpenKey(SettingsKey, True) then
+      R.WriteString(Name, Value)
+    else
+      {$push}{$warn 5044 off}  // LastError есть только у TRegistry под Windows
+      OutputDebugString(PChar(Format('Checkers: setting %s not saved, HKCU%s open error %d',
+        [Name, SettingsKey, R.LastError])));
+      {$pop}
+  finally
+    R.Free;
+  end;
+end;
 
 { TForm2 }
 
@@ -112,21 +166,9 @@ end;
   основному окну. }
 procedure TForm2.SpeedButton5Click(Sender: TObject);
 begin
-  Reg := TRegIniFile.Create('');
-  try
-    Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey('\Software', True) then
-      if Reg.CreateKey('Checkers') then
-        if Reg.OpenKey('\Software\Checkers', True) then
-        begin
-          Reg.WriteString('\Software\Checkers', 'R', IntToStr(RedBar.Position));
-          Reg.WriteString('\Software\Checkers', 'G', IntToStr(GreenBar.Position));
-          Reg.WriteString('\Software\Checkers', 'B', IntToStr(BlueBar.Position));
-        end;
-  finally
-    Reg.CloseKey;
-    Reg.Free;
-  end;
+  WriteSetting('R', IntToStr(RedBar.Position));
+  WriteSetting('G', IntToStr(GreenBar.Position));
+  WriteSetting('B', IntToStr(BlueBar.Position));
   Form1.WhiteFish.Picture := Image2.Picture;
   Form1.BlackFish.Picture := Image3.Picture;
   Image8.Picture := Image1.Picture;
@@ -164,20 +206,9 @@ begin
     end;
   Image2.Picture := Image6.Picture;
   Image3.Picture := Image5.Picture;
-  Reg := TRegIniFile.Create('');
-  try
-    Reg.RootKey := HKEY_CURRENT_USER;
-    if Reg.OpenKey('\Software', True) then
-      if Reg.OpenKey('\Software\Checkers', True) then
-      begin
-        RedBar.Position := StrToInt(Reg.ReadString('\Software\Checkers', 'R', '10'));
-        GreenBar.Position := StrToInt(Reg.ReadString('\Software\Checkers', 'G', '10'));
-        BlueBar.Position := StrToInt(Reg.ReadString('\Software\Checkers', 'B', '10'));
-      end;
-  finally
-    Reg.CloseKey;
-    Reg.Free;
-  end;
+  RedBar.Position := StrToIntDef(ReadSetting('R', '10'), 10);
+  GreenBar.Position := StrToIntDef(ReadSetting('G', '10'), 10);
+  BlueBar.Position := StrToIntDef(ReadSetting('B', '10'), 10);
   RedBarChange(Sender);
   SavedR := RedBar.Position;
   SavedG := GreenBar.Position;
