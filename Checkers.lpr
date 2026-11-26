@@ -5,7 +5,7 @@ program Checkers;
 {$mode delphi}{$H+}
 
 uses
-  Interfaces, Forms, Unit1, Unit2;
+  Interfaces, Forms, MainWindow, ColorsWindow;
 
 {$R *.res}
 
@@ -14,7 +14,7 @@ begin
   Application.Scaled := False;
   Application.Initialize;
   Application.Title := 'Шашки';
-  Application.CreateForm(TForm1, Form1);
-  Application.CreateForm(TForm2, Form2);
+  Application.CreateForm(TMainForm, MainForm);
+  Application.CreateForm(TColorsForm, ColorsForm);
   Application.Run;
 end.

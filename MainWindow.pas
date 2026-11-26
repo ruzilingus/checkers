@@ -1,4 +1,4 @@
-unit Unit1;
+unit MainWindow;
 
 { Главное окно: отрисовка, ход игрока щелчками и клавишами, режимы игры. Правила, оценка и
   перебор — в модуле Engine. Компьютер среди ходов с лучшей оценкой выбирает случайный.
@@ -25,9 +25,9 @@ type
     procedure CMMouseLeave(var Message: TLMessage); message CM_MOUSELEAVE;
   end;
 
-  { TForm1 }
+  { TMainForm }
 
-  TForm1 = class(TForm)
+  TMainForm = class(TForm)
     Title: TLabel;
     MainPanel: TPanel;
     BoardPanel: TPanel;
@@ -131,15 +131,17 @@ type
     procedure ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
     procedure UndoMove(Sender: TObject);
     function HumanStepTo(Side, CX, CY: Integer): Boolean;
+    procedure SetSetupButtons(Enabled: Boolean);
+    procedure EnterHumanMode(Human: Integer);
   end;
 
 var
-  Form1: TForm1;
+  MainForm: TMainForm;
 
 implementation
 
 uses
-  Unit2;
+  ColorsWindow;
 
 {$R *.lfm}
 {$R cursors.res}
@@ -178,7 +180,7 @@ var
   LogFileName: string; // /log=<файл> — запись позиций партии
 
   { Звуковые сигналы: «ваш ход» и неверная клавиша. Включает и выключает SoundButton,
-    выбор хранится в реестре: настройка Sound (см. SettingsKey в Unit2). }
+    выбор хранится в реестре: настройка Sound (см. SettingsKey в ColorsWindow). }
   SoundOn: Boolean = True;
 
 procedure IdleProcessMessages;
@@ -186,7 +188,8 @@ begin
   Application.ProcessMessages;
 end;
 
-procedure LogPosition(const B: TBoard);
+{ Дописывает строку S в журнал (/log); без ключа журнала ничего не делает. }
+procedure AppendLog(const S: string);
 var
   F: TextFile;
 begin
@@ -197,14 +200,19 @@ begin
     Append(F)
   else
     Rewrite(F);
-  WriteLn(F, MoveNo, ' ', BoardToText(B));
+  WriteLn(F, S);
   CloseFile(F);
+end;
+
+{ Для журнала (/log): номер позиции и сама позиция. }
+procedure LogPosition(const B: TBoard);
+begin
+  AppendLog(IntToStr(MoveNo) + ' ' + BoardToText(B));
 end;
 
 { Для журнала (/log): ходы корня перебора и их оценки. }
 procedure LogRoot(Side: Integer; IsCapture: Boolean; Count: Integer);
 var
-  F: TextFile;
   S: string;
   i: Integer;
 begin
@@ -219,13 +227,7 @@ begin
     else
       with SimList[Side][i] do
         S := S + Format(' %d%d-%d%d=%d', [FX, FY, TX, TY, RootValues[Side][i]]);
-  AssignFile(F, LogFileName);
-  if FileExists(LogFileName) then
-    Append(F)
-  else
-    Rewrite(F);
-  WriteLn(F, S);
-  CloseFile(F);
+  AppendLog(S);
 end;
 
 { ---------- Отрисовка ---------- }
@@ -286,14 +288,14 @@ begin
     end;
     G.TransparentColor := clAqua;
     G.Transparent := True;
-    Form1.SoundButton.Glyph := G;
+    MainForm.SoundButton.Glyph := G;
   finally
     G.Free;
   end;
   if SoundOn then
-    Form1.SoundButton.Hint := 'Выключить звук Ctrl+M'
+    MainForm.SoundButton.Hint := 'Выключить звук Ctrl+M'
   else
-    Form1.SoundButton.Hint := 'Включить звук Ctrl+M';
+    MainForm.SoundButton.Hint := 'Включить звук Ctrl+M';
 end;
 
 procedure DrawBoard;
@@ -303,11 +305,11 @@ begin
   for i := 1 to 8 do
     for j := 1 to 8 do
       if (i + j) mod 2 <> 0 then
-        Form1.BoardImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
-          Form1.DarkSquare.Picture.Graphic)
+        MainForm.BoardImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
+          MainForm.DarkSquare.Picture.Graphic)
       else
-        Form1.BoardImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
-          Form1.LightSquare.Picture.Graphic);
+        MainForm.BoardImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
+          MainForm.LightSquare.Picture.Graphic);
   if Flipped then
     for i := 1 to 8 do
     begin
@@ -330,10 +332,10 @@ end;
 function PieceImage(V: Integer): TImage;
 begin
   case V of
-    1: Result := Form1.WhiteFish;
-    2: Result := Form1.BlackFish;
-    11: Result := Form1.WhiteKingFish;
-    12: Result := Form1.BlackKingFish;
+    1: Result := MainForm.WhiteFish;
+    2: Result := MainForm.BlackFish;
+    11: Result := MainForm.WhiteKingFish;
+    12: Result := MainForm.BlackKingFish;
   else
     Result := nil;
   end;
@@ -345,7 +347,7 @@ var
 begin
   Img := PieceImage(B[X, Y]);
   if Img <> nil then
-    Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), Img.Picture.Graphic);
+    MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), Img.Picture.Graphic);
 end;
 
 { Рисует фигуры позиции B поверх клеток. }
@@ -353,7 +355,7 @@ procedure DrawPieces(const B: TBoard);
 var
   i, j: Integer;
 begin
-  Form1.BoardImage.Canvas.Brush.Style := bsSolid;
+  MainForm.BoardImage.Canvas.Brush.Style := bsSolid;
   for i := 1 to 8 do
     for j := 1 to 8 do
       DrawPiece(i, j, B);
@@ -397,22 +399,22 @@ var
   R, G, Bl: Byte;
   Auto: TSpeedButton;
 begin
-  C := Form1.WhiteFish.Canvas.Pixels[1, 1];
+  C := MainForm.WhiteFish.Canvas.Pixels[1, 1];
   R := Min(255 - GetRValue(C), GetRValue(C));
   G := Min(255 - GetGValue(C), GetGValue(C));
   Bl := Min(255 - GetBValue(C), GetBValue(C));
-  R := Byte(Round(GetRValue(C) + R * (Form2.RedBar.Position / 10)));
-  G := Byte(Round(GetGValue(C) + G * (Form2.GreenBar.Position / 10)));
-  Bl := Byte(Round(GetBValue(C) + Bl * (Form2.BlueBar.Position / 10)));
+  R := Byte(Round(GetRValue(C) + R * (ColorsForm.RedBar.Position / 10)));
+  G := Byte(Round(GetGValue(C) + G * (ColorsForm.GreenBar.Position / 10)));
+  Bl := Byte(Round(GetBValue(C) + Bl * (ColorsForm.BlueBar.Position / 10)));
   CW := RGB(R, G, Bl);
-  if CW = Form1.StatusWhite.Color then
+  if CW = MainForm.StatusWhite.Color then
     Exit;
   CB := MirrorColor(CW, C);
-  Form1.StatusWhite.Color := CW;
-  Form1.StatusBlack.Color := CB;
-  Fill(Form1.WhiteModeButton, 3, 3, CW);
-  Fill(Form1.BlackModeButton, 3, 3, CB);
-  Auto := Form1.AutoModeButton;
+  MainForm.StatusWhite.Color := CW;
+  MainForm.StatusBlack.Color := CB;
+  Fill(MainForm.WhiteModeButton, 3, 3, CW);
+  Fill(MainForm.BlackModeButton, 3, 3, CB);
+  Auto := MainForm.AutoModeButton;
   Fill(Auto, 3, 3, CW);
   Fill(Auto, Auto.Glyph.Width - 3, Auto.Glyph.Height - 3, CB);
 end;
@@ -423,13 +425,13 @@ var
   SW, SB: Integer;
 begin
   SideScores(B, SW, SB);
-  Form1.StatusWhite.Height := Round(Abs(SW) * 70.58823529411765 / EvalScale);
-  Form1.StatusWhite.Top := Form1.ScorePanel.Height - Form1.StatusWhite.Height - 6;
-  Form1.StatusBlack.Height := Round(Abs(SB) * 70.58823529411765 / EvalScale);
-  Form1.StatusBlack.Top := Form1.ScorePanel.Height - Form1.StatusBlack.Height - 6;
-  Form1.StatusWhite.Hint := FloatToStrF(SW / EvalScale, ffFixed, 10, 4);
-  Form1.StatusBlack.Hint := FloatToStrF(SB / EvalScale, ffFixed, 10, 4);
-  Form1.ScorePanel.Repaint;
+  MainForm.StatusWhite.Height := Round(Abs(SW) * 70.58823529411765 / EvalScale);
+  MainForm.StatusWhite.Top := MainForm.ScorePanel.Height - MainForm.StatusWhite.Height - 6;
+  MainForm.StatusBlack.Height := Round(Abs(SB) * 70.58823529411765 / EvalScale);
+  MainForm.StatusBlack.Top := MainForm.ScorePanel.Height - MainForm.StatusBlack.Height - 6;
+  MainForm.StatusWhite.Hint := FloatToStrF(SW / EvalScale, ffFixed, 10, 4);
+  MainForm.StatusBlack.Hint := FloatToStrF(SB / EvalScale, ffFixed, 10, 4);
+  MainForm.ScorePanel.Repaint;
 end;
 
 { Показывает позицию B: фигуры, история партии, цвета кнопок режимов, полоски перевеса. }
@@ -446,13 +448,13 @@ procedure MarkPath(X1, Y1, X2, Y2: Integer);
 var
   k, X, Y: Integer;
 begin
-  Form1.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), Form1.Select.Picture.Graphic);
+  MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), MainForm.Select.Picture.Graphic);
   DrawPiece(X1, Y1, Board);
   for k := 1 to Abs(X2 - X1) do
   begin
     X := Abs(X2 - X1) * k div (X2 - X1) + X1;
     Y := Abs(Y2 - Y1) * k div (Y2 - Y1) + Y1;
-    Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), Form1.Select.Picture.Graphic);
+    MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), MainForm.Select.Picture.Graphic);
     DrawPiece(X, Y, Board);
   end;
 end;
@@ -462,12 +464,12 @@ procedure ErasePath(X1, Y1, X2, Y2: Integer);
 var
   k, X, Y: Integer;
 begin
-  Form1.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), Form1.DarkSquare.Picture.Graphic);
+  MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), MainForm.DarkSquare.Picture.Graphic);
   for k := 1 to Abs(X2 - X1) do
   begin
     X := Abs(X2 - X1) * k div (X2 - X1) + X1;
     Y := Abs(Y2 - Y1) * k div (Y2 - Y1) + Y1;
-    Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), Form1.DarkSquare.Picture.Graphic);
+    MainForm.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), MainForm.DarkSquare.Picture.Graphic);
   end;
 end;
 
@@ -525,11 +527,31 @@ begin
     Result := 'Ничья: 15 ходов только дамками, без взятий.';
 end;
 
+{ Начальная позиция на доске; первыми ходят белые. }
+procedure ResetBoard;
+begin
+  DrawBoard;
+  NewBoard;
+  ShowBoard(Board);
+  LastMover := 2;
+end;
+
+{ Перерисовывает доску с показанной позицией: во время перебора — позицией до хода
+  компьютера (SaveBoard), иначе текущей. }
+procedure RedrawBoard;
+begin
+  DrawBoard;
+  if Thinking then
+    ShowBoard(SaveBoard)
+  else
+    ShowBoard(Board);
+end;
+
 { Конец партии: в игре с человеком — сообщение Msg, затем новая партия. Белыми начинает
   компьютер, если играет ими, иначе ход за человеком. }
 procedure EndGame(const Msg: string);
 begin
-  with Form1 do
+  with MainForm do
   begin
     if BlackModeButton.Down or WhiteModeButton.Down then
     begin
@@ -537,10 +559,7 @@ begin
       BlackModeButton.Enabled := True;
       WhiteModeButton.Enabled := True;
     end;
-    DrawBoard;
-    NewBoard;
-    ShowBoard(Board);
-    LastMover := 2;
+    ResetBoard;
     Step := 0;
     if WhiteModeButton.Down then
     begin
@@ -558,7 +577,7 @@ var
   Why: string;
 begin
   Result := False;
-  with Form1 do
+  with MainForm do
     if not (BlackModeButton.Down or WhiteModeButton.Down or AutoModeButton.Down) then
       Exit;
   Why := DrawReason;
@@ -573,7 +592,7 @@ end;
 function HumanToMove: Integer;
 begin
   Result := 0;
-  with Form1 do
+  with MainForm do
     if not WhiteTimer.Enabled and not BlackTimer.Enabled and not PauseTimer.Enabled then
       if BlackModeButton.Down and (LastMover = 1) then
         Result := 2
@@ -708,12 +727,12 @@ begin
   BlinkX := X;
   BlinkY := Y;
   BlinkPhase := 0;
-  Form1.BlinkTimer.Enabled := True;
+  MainForm.BlinkTimer.Enabled := True;
 end;
 
 procedure StopBlink;
 begin
-  Form1.BlinkTimer.Enabled := False;
+  MainForm.BlinkTimer.Enabled := False;
 end;
 
 { Сброс набираемого хода: мигание и отмеченные поля. }
@@ -764,7 +783,7 @@ end;
 procedure TRuzilImage.CMMouseLeave(var Message: TLMessage);
 begin
   inherited;
-  Form1.BoardImage.Cursor := crTransparent;
+  MainForm.BoardImage.Cursor := crTransparent;
   HighlightCoords(0, 0);
 end;
 
@@ -818,9 +837,9 @@ begin
   end;
 end;
 
-{ TForm1 }
+{ TMainForm }
 
-procedure TForm1.ActiveFormChanged(Sender: TObject);
+procedure TMainForm.ActiveFormChanged(Sender: TObject);
 begin
   { Как в Delphi: OnActivate — только при переходе фокуса из другого окна этой программы
     (и при первом показе), но не при возврате из чужого приложения или окна сообщения. }
@@ -835,7 +854,7 @@ end;
   клеткой в доле k/8. Фон картинки — точки с красной составляющей как у её пикселя (1, 1):
   туда перекраска в окне цветов не пишет, там всегда фон шаблона. Кадры пересоздаются после
   каждой смены цветов: прежние освобождаются. }
-procedure TForm1.CreateBlinkFish;
+procedure TMainForm.CreateBlinkFish;
 const
   Pieces: array[1..4] of Integer = (2, 1, 12, 11);
 var
@@ -855,8 +874,8 @@ begin
       Dst := TImage.Create(Self);
       Frames[V, k] := Dst;
       Dst.Picture := DarkSquare.Picture;
-      for X := 2 to Form2.WhitePreview.Width - 3 do
-        for Y := 8 to Form2.WhitePreview.Height - 9 do
+      for X := 2 to ColorsForm.WhitePreview.Width - 3 do
+        for Y := 8 to ColorsForm.WhitePreview.Height - 9 do
         begin
           C := Src.Canvas.Pixels[X, Y];
           PixR := GetRValue(C);
@@ -879,7 +898,7 @@ end;
 { Готовит текстуры клеток и подсветки, берёт цвета из окна настроек и начинает новую
   партию. В оригинале вызывается при каждой активации окна, в том числе после закрытия
   окна настройки цветов. }
-procedure TForm1.FormActivate(Sender: TObject);
+procedure TMainForm.FormActivate(Sender: TObject);
 var
   X, Y, i, j: Integer;
   C: TColor;
@@ -911,8 +930,8 @@ begin
   IconImage.Picture.Bitmap := AboutButton.Glyph;
   WhiteModeButton.Glyph := BlackModeButton.Glyph;
   PoddavkiButton.Glyph := PoddavkiOffGlyph.Picture.Bitmap;
-  Form2.FormShow(Sender);
-  Form2.OkButtonClick(Sender);
+  ColorsForm.FormShow(Sender);
+  ColorsForm.OkButtonClick(Sender);
   CreateBlinkFish;
   DrawBoard;
   NewBoard;
@@ -922,12 +941,12 @@ begin
   SimpleMoves(1, SimCnt[1], SimList[1]);
 end;
 
-procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+procedure TMainForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
   Closing := True;
 end;
 
-procedure TForm1.FormCreate(Sender: TObject);
+procedure TMainForm.FormCreate(Sender: TObject);
 var
   k: Integer;
 
@@ -1014,7 +1033,7 @@ end;
   позиции назад, промежуточная видна 100 мс. Со второй позиции — к началу партии; если
   белыми играет компьютер, он ходит заново. Возвращённая позиция заново пишется в журнал
   (/log): ShowBoard добавляет её в историю под прежним номером. }
-procedure TForm1.UndoMove(Sender: TObject);
+procedure TMainForm.UndoMove(Sender: TObject);
 var
   Target: Integer;
   ToStart: Boolean;
@@ -1052,7 +1071,7 @@ begin
   end;
 end;
 
-procedure TForm1.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+procedure TMainForm.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   S: TShiftState;
   Side: Integer;
@@ -1116,29 +1135,23 @@ begin
   end;
 end;
 
-procedure TForm1.FormShow(Sender: TObject);
+procedure TMainForm.FormShow(Sender: TObject);
 begin
-  Form1.Left := (Screen.Width - Form1.Width) div 2;
-  Form1.Top := (Screen.Height - Form1.Height - 28) div 2;
+  MainForm.Left := (Screen.Width - MainForm.Width) div 2;
+  MainForm.Top := (Screen.Height - MainForm.Height - 28) div 2;
 end;
 
 { Остановка: снимает режим игры; во время перебора просит его прерваться. }
-procedure TForm1.StopButtonClick(Sender: TObject);
+procedure TMainForm.StopButtonClick(Sender: TObject);
 begin
   BoardImage.Cursor := crTransparent;
   BlackModeButton.Enabled := True;
   WhiteModeButton.Enabled := True;
   AutoModeButton.Enabled := True;
-  NewGameButton.Enabled := True;
-  ColorsButton.Enabled := True;
-  PoddavkiButton.Enabled := True;
+  SetSetupButtons(True);
   BlinkTimer.Enabled := False;
   NoModeButton.Down := True;
-  DrawBoard;
-  if Thinking then
-    ShowBoard(SaveBoard)
-  else
-    ShowBoard(Board);
+  RedrawBoard;
   if Thinking then
     StopSearch := True
   else if BlackModeButton.Down or WhiteModeButton.Down then
@@ -1150,7 +1163,7 @@ begin
     StopSearch := True;
 end;
 
-procedure TForm1.AutoModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.AutoModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if not AutoModeButton.Down then
@@ -1158,9 +1171,7 @@ begin
     AutoModeButton.Down := True;
     BlackModeButton.Enabled := False;
     WhiteModeButton.Enabled := False;
-    NewGameButton.Enabled := False;
-    ColorsButton.Enabled := False;
-    PoddavkiButton.Enabled := False;
+    SetSetupButtons(False);
     StopSearch := False;
     BlinkTimer.Enabled := False;
     if not Thinking then
@@ -1168,110 +1179,104 @@ begin
   end;
 end;
 
-procedure TForm1.NewGameButtonClick(Sender: TObject);
+procedure TMainForm.NewGameButtonClick(Sender: TObject);
 begin
   WhiteTimer.Enabled := False;
   BlackTimer.Enabled := False;
   PauseTimer.Enabled := False;
   BlinkTimer.Enabled := False;
-  DrawBoard;
-  NewBoard;
-  ShowBoard(Board);
-  LastMover := 2;
+  ResetBoard;
   StopSearch := False;
   if BlackModeButton.Down or AutoModeButton.Down then
     WhiteTimer.Enabled := True;
 end;
 
-procedure TForm1.ColorsButtonClick(Sender: TObject);
+procedure TMainForm.ColorsButtonClick(Sender: TObject);
 begin
   NoModeButton.Down := True;
-  Form2.BackImage.Picture := BackImage.Picture;
-  Form2.ShowModal;
+  ColorsForm.BackImage.Picture := BackImage.Picture;
+  ColorsForm.ShowModal;
   DrawBoard;
   ShowBoard(Board);
-  Form1.Repaint;
-  if Form2.OkPressed then
+  MainForm.Repaint;
+  if ColorsForm.OkPressed then
     CreateBlinkFish;
 end;
 
-procedure TForm1.FlipButtonClick(Sender: TObject);
+procedure TMainForm.FlipButtonClick(Sender: TObject);
 begin
   Flipped := not Flipped;
-  DrawBoard;
-  if Thinking then
-    ShowBoard(SaveBoard)
-  else
-    ShowBoard(Board);
+  RedrawBoard;
   BoardImage.Repaint;
 end;
 
 { Перетаскивание окна без рамки за полосу заголовка. }
-procedure TForm1.TitleImageMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.TitleImageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   ReleaseCapture;
   SendMessage(Handle, WM_SYSCOMMAND, $F012, 0);
 end;
 
-procedure TForm1.CloseButtonClick(Sender: TObject);
+procedure TMainForm.CloseButtonClick(Sender: TObject);
 begin
   Close;
 end;
 
+{ Кнопки, доступные только без режима игры: «Заново», цвета, поддавки. }
+procedure TMainForm.SetSetupButtons(Enabled: Boolean);
+begin
+  NewGameButton.Enabled := Enabled;
+  ColorsButton.Enabled := Enabled;
+  PoddavkiButton.Enabled := Enabled;
+end;
+
+{ Начало игры человека за сторону Human (1 — белые, 2 — чёрные, доска переворачивается):
+  если сейчас ход компьютера, он ходит, иначе готовятся ходы человека. }
+procedure TMainForm.EnterHumanMode(Human: Integer);
+begin
+  SetSetupButtons(False);
+  BlinkTimer.Enabled := False;
+  Flipped := Human = 2;
+  DrawBoard;
+  ShowBoard(Board);
+  StopSearch := False;
+  if LastMover = Human then  // человек ходил последним — ход компьютера
+    if Human = 1 then
+      BlackTimer.Enabled := True
+    else
+      WhiteTimer.Enabled := True
+  else
+  begin
+    Step := 0;
+    CaptureMoves(Human, CapCnt[Human], CapList[Human]);
+    SimpleMoves(Human, SimCnt[Human], SimList[Human]);
+  end;
+end;
+
 { Игра за белых: компьютер играет чёрными. }
-procedure TForm1.WhiteModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.WhiteModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if not WhiteModeButton.Down then
   begin
     WhiteModeButton.Down := True;
-    NewGameButton.Enabled := False;
-    ColorsButton.Enabled := False;
-    PoddavkiButton.Enabled := False;
-    BlinkTimer.Enabled := False;
-    Flipped := False;
-    DrawBoard;
-    ShowBoard(Board);
-    StopSearch := False;
-    if LastMover = 1 then
-      BlackTimer.Enabled := True
-    else
-    begin
-      Step := 0;
-      CaptureMoves(1, CapCnt[1], CapList[1]);
-      SimpleMoves(1, SimCnt[1], SimList[1]);
-    end;
+    EnterHumanMode(1);
   end;
 end;
 
 { Игра за чёрных: компьютер играет белыми, доска переворачивается. }
-procedure TForm1.BlackModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.BlackModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if not BlackModeButton.Down then
   begin
     BlackModeButton.Down := True;
-    NewGameButton.Enabled := False;
-    ColorsButton.Enabled := False;
-    PoddavkiButton.Enabled := False;
-    BlinkTimer.Enabled := False;
-    Flipped := True;
-    DrawBoard;
-    ShowBoard(Board);
-    StopSearch := False;
-    if LastMover <> 1 then
-      WhiteTimer.Enabled := True
-    else
-    begin
-      Step := 0;
-      CaptureMoves(2, CapCnt[2], CapList[2]);
-      SimpleMoves(2, SimCnt[2], SimList[2]);
-    end;
+    EnterHumanMode(2);
   end;
 end;
 
-procedure TForm1.PoddavkiButtonClick(Sender: TObject);
+procedure TMainForm.PoddavkiButtonClick(Sender: TObject);
 begin
   LastMover := 2;
   if Poddavki = 1 then
@@ -1295,12 +1300,12 @@ begin
   ShowBoard(Board);
 end;
 
-procedure TForm1.AboutButtonClick(Sender: TObject);
+procedure TMainForm.AboutButtonClick(Sender: TObject);
 begin
   ShowMsg('         Р.Ш.Мухутдинов, ВМК, 2003 г.      ');
 end;
 
-procedure TForm1.SoundButtonClick(Sender: TObject);
+procedure TMainForm.SoundButtonClick(Sender: TObject);
 begin
   SoundOn := not SoundOn;
   ShowSound;
@@ -1308,26 +1313,26 @@ begin
 end;
 
 { Ctrl + двойной щелчок правой кнопкой по полоске — меню уровня этой стороны. }
-procedure TForm1.StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if [ssCtrl, ssRight, ssDouble] <= Shift then
-    BlackPopup.Popup(Form1.Left + ScorePanel.Left + StatusBlack.Left + X,
-      Form1.Top + ScorePanel.Top + StatusBlack.Top + Y);
+    BlackPopup.Popup(MainForm.Left + ScorePanel.Left + StatusBlack.Left + X,
+      MainForm.Top + ScorePanel.Top + StatusBlack.Top + Y);
 end;
 
-procedure TForm1.StatusWhiteMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.StatusWhiteMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if [ssCtrl, ssRight, ssDouble] <= Shift then
-    WhitePopup.Popup(Form1.Left + ScorePanel.Left + StatusWhite.Left + X,
-      Form1.Top + ScorePanel.Top + StatusWhite.Top + Y);
+    WhitePopup.Popup(MainForm.Left + ScorePanel.Left + StatusWhite.Left + X,
+      MainForm.Top + ScorePanel.Top + StatusWhite.Top + Y);
 end;
 
 { Ход компьютера за сторону Side в режиме Mode (человек играет другой стороной) или в игре
   с самим собой. Кнопка режима другой стороны (Other) на время раздумья недоступна. Ходить
   нечем — конец партии; иначе пауза с подсвеченным путём (PauseTimer). }
-procedure TForm1.ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
+procedure TMainForm.ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
 begin
   if not (Mode.Down or AutoModeButton.Down) then
     Exit;
@@ -1353,21 +1358,21 @@ begin
 end;
 
 { Ход компьютера за белых. }
-procedure TForm1.WhiteTimerTimer(Sender: TObject);
+procedure TMainForm.WhiteTimerTimer(Sender: TObject);
 begin
   WhiteTimer.Enabled := False;
   ComputerTurn(1, BlackModeButton, WhiteModeButton);
 end;
 
 { Ход компьютера за чёрных. }
-procedure TForm1.BlackTimerTimer(Sender: TObject);
+procedure TMainForm.BlackTimerTimer(Sender: TObject);
 begin
   BlackTimer.Enabled := False;
   ComputerTurn(2, WhiteModeButton, BlackModeButton);
 end;
 
 { Конец паузы после хода компьютера: снимает подсветку и передаёт ход. }
-procedure TForm1.PauseTimerTimer(Sender: TObject);
+procedure TMainForm.PauseTimerTimer(Sender: TObject);
 var
   Human: Integer;
 begin
@@ -1412,7 +1417,7 @@ begin
 end;
 
 { Мигание выбранной фигуры: 16 тактов от фигуры к клетке и обратно. }
-procedure TForm1.BlinkTimerTimer(Sender: TObject);
+procedure TMainForm.BlinkTimerTimer(Sender: TObject);
 var
   Side, V, k: Integer;
   Frame: TImage;
@@ -1456,18 +1461,18 @@ begin
     Popup.Items[i].Checked := i = Item.MenuIndex;
 end;
 
-procedure TForm1.OnWhiteItemClick(Sender: TObject);
+procedure TMainForm.OnWhiteItemClick(Sender: TObject);
 begin
   SelectLevel(WhitePopup, Sender as TMenuItem, WhiteLevel);
 end;
 
-procedure TForm1.OnBlackItemClick(Sender: TObject);
+procedure TMainForm.OnBlackItemClick(Sender: TObject);
 begin
   SelectLevel(BlackPopup, Sender as TMenuItem, BlackLevel);
 end;
 
 { Подсветка координат под курсором и вид курсора: можно ли сходить на это поле. }
-procedure TForm1.BoardImageMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+procedure TMainForm.BoardImageMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var
   CX, CY, Idx, Side: Integer;
   Fin: Boolean;
@@ -1486,7 +1491,7 @@ end;
 { Отмечает поле (CX, CY) в ходе человека за Side: фигуру — начало нового хода, свободное
   поле — очередное поле пути; последнее поле делает ход и передаёт ход компьютеру. False —
   на это поле ходить нельзя, ничего не сделано. }
-function TForm1.HumanStepTo(Side, CX, CY: Integer): Boolean;
+function TMainForm.HumanStepTo(Side, CX, CY: Integer): Boolean;
 var
   Idx: Integer;
   Fin: Boolean;
@@ -1528,7 +1533,7 @@ begin
 end;
 
 { Ход игрока щелчками: фигура, затем поля пути по одному. Щелчок мимо сбрасывает выбор. }
-procedure TForm1.BoardImageMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.BoardImageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
   CX, CY, Side: Integer;

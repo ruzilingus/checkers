@@ -1,4 +1,4 @@
-unit Unit2;
+unit ColorsWindow;
 
 { Окно «Настройка цветов». Цвет белых шашек задаётся тремя ползунками (множители каналов
   от -10 до 10, по умолчанию 10 — исходный цвет картинки), чёрные получаются отражением
@@ -15,9 +15,9 @@ uses
 
 type
 
-  { TForm2 }
+  { TColorsForm }
 
-  TForm2 = class(TForm)
+  TColorsForm = class(TForm)
     RedBar: TTrackBar;
     GreenBar: TTrackBar;
     BlueBar: TTrackBar;
@@ -47,12 +47,13 @@ type
     procedure RedBarKeyPress(Sender: TObject; var Key: Char);
   private
     procedure Recolor(Template: TImage);
+    procedure ShowSliderValues;
   public
     OkPressed: Boolean;
   end;
 
 var
-  Form2: TForm2;
+  ColorsForm: TColorsForm;
 
 const
   { Ключ настроек в HKCU: цвета (R, G, B) и звук (Sound). AppDataLow, а не Software\Checkers:
@@ -69,7 +70,7 @@ function MirrorColor(C, Base: TColor): TColor;
 implementation
 
 uses
-  Unit1;
+  MainWindow;
 
 {$R *.lfm}
 
@@ -133,12 +134,12 @@ begin
   end;
 end;
 
-{ TForm2 }
+{ TColorsForm }
 
 { Перекрашивает образцы WhitePreview и BlackPreview по шаблону Template: точки фигуры
   сдвигаются от цвета фона множителями ползунков, у чёрных — отражение. Точки, где у шаблона
   фон, в образцах не трогаются. }
-procedure TForm2.Recolor(Template: TImage);
+procedure TColorsForm.Recolor(Template: TImage);
 var
   X, Y: Integer;
   C, Base: TColor;
@@ -164,9 +165,9 @@ begin
     end;
 end;
 
-procedure TForm2.RedBarChange(Sender: TObject);
+{ Подписи значений и стрелки ползунков — по их положению. }
+procedure TColorsForm.ShowSliderValues;
 begin
-  Recolor(ManTemplate);
   RLabel.Caption := IntToStr(RedBar.Position);
   GLabel.Caption := IntToStr(GreenBar.Position);
   BLabel.Caption := IntToStr(BlueBar.Position);
@@ -175,7 +176,13 @@ begin
   BlueUpDown.Position := BlueBar.Position;
 end;
 
-procedure TForm2.RedUpDownClick(Sender: TObject; Button: TUDBtnType);
+procedure TColorsForm.RedBarChange(Sender: TObject);
+begin
+  Recolor(ManTemplate);
+  ShowSliderValues;
+end;
+
+procedure TColorsForm.RedUpDownClick(Sender: TObject; Button: TUDBtnType);
 begin
   RedBar.Position := RedUpDown.Position;
   GreenBar.Position := GreenUpDown.Position;
@@ -186,23 +193,23 @@ end;
 { Кнопка OK: сохраняет множители и раздаёт основному окну перекрашенные шашки и дамки.
   Дамка перекрашивается поверх образцов шашки: где у шаблона дамки фон, остаются точки
   шашки. }
-procedure TForm2.OkButtonClick(Sender: TObject);
+procedure TColorsForm.OkButtonClick(Sender: TObject);
 begin
   WriteSetting('R', IntToStr(RedBar.Position));
   WriteSetting('G', IntToStr(GreenBar.Position));
   WriteSetting('B', IntToStr(BlueBar.Position));
-  Form1.WhiteFish.Picture := WhitePreview.Picture;
-  Form1.BlackFish.Picture := BlackPreview.Picture;
+  MainForm.WhiteFish.Picture := WhitePreview.Picture;
+  MainForm.BlackFish.Picture := BlackPreview.Picture;
   Recolor(KingTemplate);
-  Form1.WhiteKingFish.Picture := WhitePreview.Picture;
-  Form1.BlackKingFish.Picture := BlackPreview.Picture;
+  MainForm.WhiteKingFish.Picture := WhitePreview.Picture;
+  MainForm.BlackKingFish.Picture := BlackPreview.Picture;
   OkPressed := True;
   Close;
 end;
 
 { Открытие окна (и подготовка цветов при запуске игры): фон, образцы исходных цветов —
   белые как в шаблоне, чёрные отражением, — затем ползунки из настроек и образцы по ним. }
-procedure TForm2.FormShow(Sender: TObject);
+procedure TColorsForm.FormShow(Sender: TObject);
 var
   X, Y: Integer;
   C, Base: TColor;
@@ -226,37 +233,26 @@ begin
   RedBar.Position := StrToIntDef(ReadSetting('R', '10'), 10);
   GreenBar.Position := StrToIntDef(ReadSetting('G', '10'), 10);
   BlueBar.Position := StrToIntDef(ReadSetting('B', '10'), 10);
-  RedBarChange(Sender);
+  RedBarChange(Sender);  // образцы, подписи и стрелки — по ползункам
   SavedR := RedBar.Position;
   SavedG := GreenBar.Position;
   SavedB := BlueBar.Position;
-  RedUpDown.Position := SavedR;
-  GreenUpDown.Position := SavedG;
-  BlueUpDown.Position := SavedB;
-  RLabel.Caption := IntToStr(SavedR);
-  GLabel.Caption := IntToStr(SavedG);
-  BLabel.Caption := IntToStr(SavedB);
   OkPressed := False;
 end;
 
 { Закрытие без OK возвращает ползунки к значениям на момент открытия окна. }
-procedure TForm2.FormClose(Sender: TObject; var CloseAction: TCloseAction);
+procedure TColorsForm.FormClose(Sender: TObject; var CloseAction: TCloseAction);
 begin
   if not OkPressed then
   begin
     RedBar.Position := SavedR;
     GreenBar.Position := SavedG;
     BlueBar.Position := SavedB;
-    RedUpDown.Position := SavedR;
-    GreenUpDown.Position := SavedG;
-    BlueUpDown.Position := SavedB;
-    RLabel.Caption := IntToStr(SavedR);
-    GLabel.Caption := IntToStr(SavedG);
-    BLabel.Caption := IntToStr(SavedB);
+    ShowSliderValues;
   end;
 end;
 
-procedure TForm2.RedBarKeyPress(Sender: TObject; var Key: Char);
+procedure TColorsForm.RedBarKeyPress(Sender: TObject; var Key: Char);
 begin
   if Key = #27 then
     Close;
