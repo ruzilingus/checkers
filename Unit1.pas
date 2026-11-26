@@ -3,9 +3,9 @@ unit Unit1;
 { Главное окно: отрисовка, ход игрока щелчками и клавишами, режимы игры. Правила, оценка и
   перебор — в модуле Engine. Компьютер среди ходов с лучшей оценкой выбирает случайный.
 
-  Ходы игрока и компьютера идут через таймеры: Timer1 — ход компьютера за белых,
-  Timer2 — за чёрных (оба — ComputerTurn), Timer3 — пауза после хода компьютера с
-  подсвеченным путём, затем ход человека или компьютера. Timer3.Tag хранит, кто ходил
+  Ходы игрока и компьютера идут через таймеры: WhiteTimer — ход компьютера за белых,
+  BlackTimer — за чёрных (оба — ComputerTurn), PauseTimer — пауза после хода компьютера с
+  подсвеченным путём, затем ход человека или компьютера. PauseTimer.Tag хранит, кто ходил
   последним: 1 — белые (ходят чёрные), 2 — чёрные (ходят белые). Сейчас ли ход человека —
   HumanToMove; конец партии (проигрыш или ничья) — EndGame. }
 
@@ -29,46 +29,47 @@ type
 
   TForm1 = class(TForm)
     Title: TLabel;
-    Panel1: TPanel;
-    Panel2: TPanel;
-    Panel3: TPanel;
+    MainPanel: TPanel;
+    BoardPanel: TPanel;
+    ScorePanel: TPanel;
     StatusBlack: TPanel;
     StatusWhite: TPanel;
-    Image6: TImage;
-    Image7: TImage;
-    Image8: TImage;
-    Image9: TImage;
+    BackImage: TImage;
+    TitleImage: TImage;
+    IconImage: TImage;
+    ScoreBackImage: TImage;
     Smile1: TImage;
     Smile2: TImage;
-    White: TImage;
-    Black: TImage;
+    LightSquare: TImage;
+    DarkSquare: TImage;
     Select: TImage;
     WhiteFish: TImage;
     BlackFish: TImage;
     WhiteFish2: TImage;
     BlackFish2: TImage;
-    Bevel1: TBevel;
-    Bevel2: TBevel;
-    Bevel3: TBevel;
-    Bevel4: TBevel;
-    Bevel5: TBevel;
-    Bevel6: TBevel;
-    Bevel7: TBevel;
-    Bevel8: TBevel;
-    Bevel9: TBevel;
-    Reserve: TSpeedButton;
-    SpeedButton1: TSpeedButton;
-    SpeedButton2: TSpeedButton;
-    SpeedButton3: TSpeedButton;
-    SpeedButton4: TSpeedButton;
-    SpeedButton5: TSpeedButton;
-    SpeedButton6: TSpeedButton;
-    SpeedButton8: TSpeedButton;
-    SpeedButton9: TSpeedButton;
-    SpeedButton10: TSpeedButton;
-    Timer1: TTimer;
-    Timer2: TTimer;
-    Timer3: TTimer;
+    AutoModeBevel: TBevel;
+    WhiteModeBevel: TBevel;
+    BlackModeBevel: TBevel;
+    StopBevel: TBevel;
+    AboutBevel: TBevel;
+    NewGameBevel: TBevel;
+    ColorsBevel: TBevel;
+    FlipBevel: TBevel;
+    PoddavkiBevel: TBevel;
+    NoModeButton: TSpeedButton;
+    BlackModeButton: TSpeedButton;
+    WhiteModeButton: TSpeedButton;
+    AutoModeButton: TSpeedButton;
+    NewGameButton: TSpeedButton;
+    ColorsButton: TSpeedButton;
+    FlipButton: TSpeedButton;
+    CloseButton: TSpeedButton;
+    PoddavkiButton: TSpeedButton;
+    StopButton: TSpeedButton;
+    AboutButton: TSpeedButton;
+    WhiteTimer: TTimer;
+    BlackTimer: TTimer;
+    PauseTimer: TTimer;
     BlinkTimer: TTimer;
     WhitePopup: TPopupMenu;
     BlackPopup: TPopupMenu;
@@ -86,7 +87,6 @@ type
     BlackLevel5: TMenuItem;
     BlackLevel6: TMenuItem;
     BlackLevel7: TMenuItem;
-    SpeedButton7: TSpeedButton;
     SoundBevel: TBevel;
     SoundButton: TSpeedButton;
     procedure FormActivate(Sender: TObject);
@@ -94,38 +94,38 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormShow(Sender: TObject);
-    procedure SpeedButton10Click(Sender: TObject);
-    procedure SpeedButton3MouseDown(Sender: TObject; Button: TMouseButton;
+    procedure StopButtonClick(Sender: TObject);
+    procedure AutoModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure SpeedButton4Click(Sender: TObject);
-    procedure SpeedButton5Click(Sender: TObject);
-    procedure SpeedButton6Click(Sender: TObject);
-    procedure Image7MouseDown(Sender: TObject; Button: TMouseButton;
+    procedure NewGameButtonClick(Sender: TObject);
+    procedure ColorsButtonClick(Sender: TObject);
+    procedure FlipButtonClick(Sender: TObject);
+    procedure TitleImageMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure SpeedButton8Click(Sender: TObject);
-    procedure SpeedButton2MouseDown(Sender: TObject; Button: TMouseButton;
+    procedure CloseButtonClick(Sender: TObject);
+    procedure WhiteModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure SpeedButton1MouseDown(Sender: TObject; Button: TMouseButton;
+    procedure BlackModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure SpeedButton9Click(Sender: TObject);
-    procedure SpeedButton7Click(Sender: TObject);
+    procedure PoddavkiButtonClick(Sender: TObject);
+    procedure AboutButtonClick(Sender: TObject);
     procedure SoundButtonClick(Sender: TObject);
     procedure StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure StatusWhiteMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure Timer1Timer(Sender: TObject);
-    procedure Timer2Timer(Sender: TObject);
-    procedure Timer3Timer(Sender: TObject);
+    procedure WhiteTimerTimer(Sender: TObject);
+    procedure BlackTimerTimer(Sender: TObject);
+    procedure PauseTimerTimer(Sender: TObject);
     procedure BlinkTimerTimer(Sender: TObject);
     procedure OnWhiteItemClick(Sender: TObject);
     procedure OnBlackItemClick(Sender: TObject);
     procedure CreateBlinkFish;
-    procedure Image1MouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
-    procedure Image1MouseDown(Sender: TObject; Button: TMouseButton;
+    procedure BoardImageMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure BoardImageMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
   private
-    Image1: TRuzilImage;
+    BoardImage: TRuzilImage;
     FLastActiveForm: TCustomForm;
     procedure ActiveFormChanged(Sender: TObject);
     procedure ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
@@ -294,11 +294,11 @@ begin
   for i := 1 to 8 do
     for j := 1 to 8 do
       if (i + j) mod 2 <> 0 then
-        Form1.Image1.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
-          Form1.Black.Picture.Graphic)
+        Form1.BoardImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
+          Form1.DarkSquare.Picture.Graphic)
       else
-        Form1.Image1.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
-          Form1.White.Picture.Graphic);
+        Form1.BoardImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
+          Form1.LightSquare.Picture.Graphic);
   if Flipped then
     for i := 1 to 8 do
     begin
@@ -329,7 +329,7 @@ begin
   else
     Exit;
   end;
-  Form1.Image1.Canvas.StretchDraw(SquareRect(X, Y), G);
+  Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), G);
 end;
 
 { Рисует фигуры позиции, ведёт историю ходов, перекрашивает индикаторы и кнопки режимов
@@ -341,7 +341,7 @@ var
   C: TColor;
   R, G, Bl: Byte;
 begin
-  Form1.Image1.Canvas.Brush.Style := bsSolid;
+  Form1.BoardImage.Canvas.Brush.Style := bsSolid;
   for i := 1 to 8 do
     for j := 1 to 8 do
       DrawPiece(i, j, B);
@@ -367,39 +367,39 @@ begin
     Form1.StatusWhite.Color := RGB(R, G, Bl);
     Form1.StatusBlack.Color := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G),
       Byte(2 * GetBValue(C) - Bl));
-    with Form1.SpeedButton2.Glyph.Canvas do
+    with Form1.WhiteModeButton.Glyph.Canvas do
     begin
       Brush.Color := RGB(R, G, Bl);
       FloodFill(3, 3, clBlack, fsBorder);
     end;
-    with Form1.SpeedButton1.Glyph.Canvas do
+    with Form1.BlackModeButton.Glyph.Canvas do
     begin
       Brush.Color := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G),
         Byte(2 * GetBValue(C) - Bl));
       FloodFill(3, 3, clBlack, fsBorder);
     end;
-    with Form1.SpeedButton3.Glyph.Canvas do
+    with Form1.AutoModeButton.Glyph.Canvas do
     begin
       Brush.Color := RGB(R, G, Bl);
       FloodFill(3, 3, clBlack, fsBorder);
     end;
-    with Form1.SpeedButton3.Glyph.Canvas do
+    with Form1.AutoModeButton.Glyph.Canvas do
     begin
       Brush.Color := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G),
         Byte(2 * GetBValue(C) - Bl));
-      FloodFill(Form1.SpeedButton3.Glyph.Width - 3, Form1.SpeedButton3.Glyph.Height - 3,
+      FloodFill(Form1.AutoModeButton.Glyph.Width - 3, Form1.AutoModeButton.Glyph.Height - 3,
         clBlack, fsBorder);
     end;
   end;
 
   SideScores(SW, SB);
   Form1.StatusWhite.Height := Round(Abs(SW) * 70.58823529411765 / EvalScale);
-  Form1.StatusWhite.Top := Form1.Panel3.Height - Form1.StatusWhite.Height - 6;
+  Form1.StatusWhite.Top := Form1.ScorePanel.Height - Form1.StatusWhite.Height - 6;
   Form1.StatusBlack.Height := Round(Abs(SB) * 70.58823529411765 / EvalScale);
-  Form1.StatusBlack.Top := Form1.Panel3.Height - Form1.StatusBlack.Height - 6;
+  Form1.StatusBlack.Top := Form1.ScorePanel.Height - Form1.StatusBlack.Height - 6;
   Form1.StatusWhite.Hint := FloatToStrF(SW / EvalScale, ffFixed, 10, 4);
   Form1.StatusBlack.Hint := FloatToStrF(SB / EvalScale, ffFixed, 10, 4);
-  Form1.Panel3.Repaint;
+  Form1.ScorePanel.Repaint;
 end;
 
 { Подсвечивает путь хода от (X1, Y1) до (X2, Y2) включительно и рисует фигуры поверх. }
@@ -407,13 +407,13 @@ procedure MarkPath(X1, Y1, X2, Y2: Integer);
 var
   k, X, Y: Integer;
 begin
-  Form1.Image1.Canvas.StretchDraw(SquareRect(X1, Y1), Form1.Select.Picture.Graphic);
+  Form1.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), Form1.Select.Picture.Graphic);
   DrawPiece(X1, Y1, Board);
   for k := 1 to Abs(X2 - X1) do
   begin
     X := Abs(X2 - X1) * k div (X2 - X1) + X1;
     Y := Abs(Y2 - Y1) * k div (Y2 - Y1) + Y1;
-    Form1.Image1.Canvas.StretchDraw(SquareRect(X, Y), Form1.Select.Picture.Graphic);
+    Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), Form1.Select.Picture.Graphic);
     DrawPiece(X, Y, Board);
   end;
 end;
@@ -423,12 +423,12 @@ procedure ErasePath(X1, Y1, X2, Y2: Integer);
 var
   k, X, Y: Integer;
 begin
-  Form1.Image1.Canvas.StretchDraw(SquareRect(X1, Y1), Form1.Black.Picture.Graphic);
+  Form1.BoardImage.Canvas.StretchDraw(SquareRect(X1, Y1), Form1.DarkSquare.Picture.Graphic);
   for k := 1 to Abs(X2 - X1) do
   begin
     X := Abs(X2 - X1) * k div (X2 - X1) + X1;
     Y := Abs(Y2 - Y1) * k div (Y2 - Y1) + Y1;
-    Form1.Image1.Canvas.StretchDraw(SquareRect(X, Y), Form1.Black.Picture.Graphic);
+    Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), Form1.DarkSquare.Picture.Graphic);
   end;
 end;
 
@@ -492,24 +492,24 @@ procedure EndGame(const Msg: string);
 begin
   with Form1 do
   begin
-    if SpeedButton1.Down or SpeedButton2.Down then
+    if BlackModeButton.Down or WhiteModeButton.Down then
     begin
       ShowMsg(Msg);
-      SpeedButton1.Enabled := True;
-      SpeedButton2.Enabled := True;
+      BlackModeButton.Enabled := True;
+      WhiteModeButton.Enabled := True;
     end;
     DrawBoard;
     NewBoard;
     ShowBoard(Board);
-    Timer3.Tag := 2;
+    PauseTimer.Tag := 2;
     Step := 0;
-    if SpeedButton2.Down then
+    if WhiteModeButton.Down then
     begin
       CaptureMoves(1, CapCnt[1], CapList[1]);
       SimpleMoves(1, SimCnt[1], SimList[1]);
     end
     else
-      Timer1.Enabled := True;
+      WhiteTimer.Enabled := True;
   end;
 end;
 
@@ -520,7 +520,7 @@ var
 begin
   Result := False;
   with Form1 do
-    if not (SpeedButton1.Down or SpeedButton2.Down or SpeedButton3.Down) then
+    if not (BlackModeButton.Down or WhiteModeButton.Down or AutoModeButton.Down) then
       Exit;
   Why := DrawReason;
   if Why = '' then
@@ -535,10 +535,10 @@ function HumanToMove: Integer;
 begin
   Result := 0;
   with Form1 do
-    if not Timer1.Enabled and not Timer2.Enabled and not Timer3.Enabled then
-      if SpeedButton1.Down and (Timer3.Tag = 1) then
+    if not WhiteTimer.Enabled and not BlackTimer.Enabled and not PauseTimer.Enabled then
+      if BlackModeButton.Down and (PauseTimer.Tag = 1) then
         Result := 2
-      else if SpeedButton2.Down and (Timer3.Tag <> 1) then
+      else if WhiteModeButton.Down and (PauseTimer.Tag <> 1) then
         Result := 1;
 end;
 
@@ -662,7 +662,7 @@ var
   k: Integer;
 begin
   inherited;
-  Form1.Image1.Cursor := crTransparent;
+  Form1.BoardImage.Cursor := crTransparent;
   for k := 1 to 8 do
   begin
     if LetTop[k].Font.Color <> LabelColor then
@@ -754,7 +754,7 @@ var
     PixB := GetBValue(PixColor);
     if PixR <> BaseR then
     begin
-      PixColor := Black.Canvas.Pixels[X, Y];
+      PixColor := DarkSquare.Canvas.Pixels[X, Y];
       R0 := GetRValue(PixColor);
       G0 := GetGValue(PixColor);
       B0 := GetBValue(PixColor);
@@ -775,10 +775,10 @@ begin
     FrameW[k] := TImage.Create(Self);
     FrameB2[k] := TImage.Create(Self);
     FrameW2[k] := TImage.Create(Self);
-    FrameB[k].Picture := Black.Picture;
-    FrameW[k].Picture := Black.Picture;
-    FrameB2[k].Picture := Black.Picture;
-    FrameW2[k].Picture := Black.Picture;
+    FrameB[k].Picture := DarkSquare.Picture;
+    FrameW[k].Picture := DarkSquare.Picture;
+    FrameB2[k].Picture := DarkSquare.Picture;
+    FrameW2[k].Picture := DarkSquare.Picture;
     for X := 2 to Form2.Image2.Width - 3 do
       for Y := 8 to Form2.Image2.Height - 9 do
       begin
@@ -803,11 +803,11 @@ begin
   for X := 0 to 49 do
     for Y := 0 to 49 do
     begin
-      C := Black.Canvas.Pixels[X, Y];
+      C := DarkSquare.Canvas.Pixels[X, Y];
       R := GetRValue(C);
       G := GetGValue(C);
       B := GetBValue(C);
-      White.Canvas.Pixels[X, Y] := RGB(Byte(Round(R + (255 - R) * 0.65)),
+      LightSquare.Canvas.Pixels[X, Y] := RGB(Byte(Round(R + (255 - R) * 0.65)),
         Byte(Round(G + (255 - G) * 0.65)), Byte(Round(B + (255 - B) * 0.65)));
       T := 1 - Power(Sqrt(Min(1.0, Sqr(Abs(X - 24.5) / 24.5) + Sqr(Abs(Y - 24.5) / 24.5))),
         1.01) / 2;
@@ -816,15 +816,15 @@ begin
     end;
   for i := 1 to 12 do
     for j := 1 to 11 do
-      Image6.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
-        White.Picture.Graphic);
+      BackImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
+        LightSquare.Picture.Graphic);
   for i := 1 to 2 do
     for j := 1 to 3 do
-      Image9.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
-        White.Picture.Graphic);
-  Image8.Picture.Bitmap := SpeedButton7.Glyph;
-  SpeedButton2.Glyph := SpeedButton1.Glyph;
-  SpeedButton9.Glyph := Smile2.Picture.Bitmap;
+      ScoreBackImage.Canvas.StretchDraw(Rect((i - 1) * 50, (j - 1) * 50, i * 50, j * 50),
+        LightSquare.Picture.Graphic);
+  IconImage.Picture.Bitmap := AboutButton.Glyph;
+  WhiteModeButton.Glyph := BlackModeButton.Glyph;
+  PoddavkiButton.Glyph := Smile2.Picture.Bitmap;
   Form2.FormShow(Sender);
   Form2.SpeedButton5Click(Sender);
   CreateBlinkFish;
@@ -864,6 +864,16 @@ var
     Result.Cursor := crTransparent;
   end;
 
+  { Курсор игры над рамкой окна, кнопками и полосками; над доской курсор ставит
+    BoardImageMouseMove. }
+  procedure SetTransparentCursor(const Controls: array of TControl);
+  var
+    i: Integer;
+  begin
+    for i := 0 to High(Controls) do
+      Controls[i].Cursor := crTransparent;
+  end;
+
 begin
   for k := 1 to ParamCount do
     if SameText(ParamStr(k), '/fixedseed') then
@@ -876,14 +886,14 @@ begin
   SoundOn := ReadSetting('Sound', '1') <> '0';
   ShowSound;
 
-  Image1 := TRuzilImage.Create(Self);
-  Image1.Left := 1;
-  Image1.Top := 1;
-  Image1.Width := 400;
-  Image1.Height := 400;
-  Image1.Parent := Panel2;
-  Image1.OnMouseMove := Image1MouseMove;
-  Image1.OnMouseDown := Image1MouseDown;
+  BoardImage := TRuzilImage.Create(Self);
+  BoardImage.Left := 1;
+  BoardImage.Top := 1;
+  BoardImage.Width := 400;
+  BoardImage.Height := 400;
+  BoardImage.Parent := BoardPanel;
+  BoardImage.OnMouseMove := BoardImageMouseMove;
+  BoardImage.OnMouseDown := BoardImageMouseDown;
   for k := 1 to 8 do
   begin
     DigLeft[k] := MakeLabel(18, (9 - k) * 50 + 20, 13, IntToStr(k));
@@ -893,23 +903,18 @@ begin
   end;
   Screen.Cursors[crTransparent] := LoadCursor(HInstance, 'TRANSPARENTCURSOR');
   Screen.Cursors[crEnabled] := LoadCursor(HInstance, 'ENABLEDCURSOR');
-  Title.Cursor := crTransparent;
-  StatusWhite.Cursor := crTransparent;
-  StatusBlack.Cursor := crTransparent;
-  for k := 1 to 10 do
-    TControl(FindComponent('SpeedButton' + IntToStr(k))).Cursor := crTransparent;
-  for k := 1 to 9 do
-    TControl(FindComponent('Bevel' + IntToStr(k))).Cursor := crTransparent;
-  for k := 6 to 9 do
-    TControl(FindComponent('Image' + IntToStr(k))).Cursor := crTransparent;
-  for k := 1 to 3 do
-    TControl(FindComponent('Panel' + IntToStr(k))).Cursor := crTransparent;
+  SetTransparentCursor([Title, StatusWhite, StatusBlack,
+    BlackModeButton, WhiteModeButton, AutoModeButton, NewGameButton, ColorsButton, FlipButton,
+    AboutButton, CloseButton, PoddavkiButton, StopButton, SoundButton,
+    AutoModeBevel, WhiteModeBevel, BlackModeBevel, StopBevel, AboutBevel, NewGameBevel,
+    ColorsBevel, FlipBevel, PoddavkiBevel, SoundBevel,
+    BackImage, TitleImage, IconImage, ScoreBackImage, MainPanel, BoardPanel, ScorePanel]);
   // глифы кнопок режимов перекрашиваются под цвет шашек — их не трогаем
-  AddDisabledGlyph(SpeedButton4);
-  AddDisabledGlyph(SpeedButton5);
-  AddDisabledGlyph(SpeedButton6);
-  AddDisabledGlyph(SpeedButton7);
-  AddDisabledGlyph(SpeedButton10);
+  AddDisabledGlyph(NewGameButton);
+  AddDisabledGlyph(ColorsButton);
+  AddDisabledGlyph(FlipButton);
+  AddDisabledGlyph(AboutButton);
+  AddDisabledGlyph(StopButton);
   // галочка — на уровне по умолчанию из Engine
   for k := 1 to WhitePopup.Items.Count do
     WhitePopup.Items[k - 1].Checked := k = WhiteLevel;
@@ -929,14 +934,14 @@ begin
   S := Shift * [ssShift, ssAlt, ssCtrl, ssLeft, ssRight, ssMiddle, ssDouble];
 
   // отмена хода: Ctrl+Z или Alt+Backspace
-  if SpeedButton1.Enabled and SpeedButton2.Enabled and (MoveNo > 2)
+  if BlackModeButton.Enabled and WhiteModeButton.Enabled and (MoveNo > 2)
     and (((Key = VK_BACK) and (S = [ssAlt])) or ((Key = Ord('Z')) and (S = [ssCtrl]))) then
   begin
     CopyBoard(Board, History[MoveNo - 1]);
     Dec(MoveNo);
     DrawBoard;
     ShowBoard(Board);
-    Image1.Repaint;
+    BoardImage.Repaint;
     Sleep(100);
     CopyBoard(Board, History[MoveNo - 1]);
     MoveNo := MoveNo - 2;
@@ -946,10 +951,10 @@ begin
     CaptureMoves(2, CapCnt[2], CapList[2]);
     SimpleMoves(1, SimCnt[1], SimList[1]);
     SimpleMoves(2, SimCnt[2], SimList[2]);
-    Image1.Repaint;
+    BoardImage.Repaint;
     Key := VK_ESCAPE;
   end;
-  if SpeedButton1.Enabled and SpeedButton2.Enabled and (MoveNo = 2)
+  if BlackModeButton.Enabled and WhiteModeButton.Enabled and (MoveNo = 2)
     and (((Key = VK_BACK) and (S = [ssAlt])) or ((Key = Ord('Z')) and (S = [ssCtrl]))) then
   begin
     CopyBoard(Board, History[MoveNo - 1]);
@@ -960,39 +965,39 @@ begin
     CaptureMoves(2, CapCnt[2], CapList[2]);
     SimpleMoves(1, SimCnt[1], SimList[1]);
     SimpleMoves(2, SimCnt[2], SimList[2]);
-    Image1.Repaint;
-    Timer3.Tag := 2;
-    if SpeedButton1.Down then
+    BoardImage.Repaint;
+    PauseTimer.Tag := 2;
+    if BlackModeButton.Down then
     begin
-      Reserve.Down := True;
-      SpeedButton1MouseDown(Sender, mbLeft, [], 1, 1);
+      NoModeButton.Down := True;
+      BlackModeButtonMouseDown(Sender, mbLeft, [], 1, 1);
     end;
     Key := VK_ESCAPE;
   end;
   if Key = VK_ESCAPE then
   begin
     Form1.Tag := 0;
-    Image1MouseDown(Sender, mbLeft, [], 444, 444);
+    BoardImageMouseDown(Sender, mbLeft, [], 444, 444);
   end;
 
   if ssCtrl in S then
   begin
     case Key of
-      Ord('A'): if SpeedButton3.Enabled then SpeedButton3MouseDown(Sender, mbLeft, [], 1, 1);
-      Ord('W'): if SpeedButton2.Enabled then SpeedButton2MouseDown(Sender, mbLeft, [], 1, 1);
-      Ord('B'): if SpeedButton1.Enabled then SpeedButton1MouseDown(Sender, mbLeft, [], 1, 1);
-      Ord('N'): if SpeedButton4.Enabled then SpeedButton4Click(Sender);
-      Ord('C'): if SpeedButton5.Enabled then SpeedButton5Click(Sender);
-      Ord('O'): if SpeedButton6.Enabled then SpeedButton6Click(Sender);
-      Ord('G'): if SpeedButton9.Enabled then SpeedButton9Click(Sender);
-      Ord('S'): if SpeedButton10.Enabled then SpeedButton10Click(Sender);
+      Ord('A'): if AutoModeButton.Enabled then AutoModeButtonMouseDown(Sender, mbLeft, [], 1, 1);
+      Ord('W'): if WhiteModeButton.Enabled then WhiteModeButtonMouseDown(Sender, mbLeft, [], 1, 1);
+      Ord('B'): if BlackModeButton.Enabled then BlackModeButtonMouseDown(Sender, mbLeft, [], 1, 1);
+      Ord('N'): if NewGameButton.Enabled then NewGameButtonClick(Sender);
+      Ord('C'): if ColorsButton.Enabled then ColorsButtonClick(Sender);
+      Ord('O'): if FlipButton.Enabled then FlipButtonClick(Sender);
+      Ord('G'): if PoddavkiButton.Enabled then PoddavkiButtonClick(Sender);
+      Ord('S'): if StopButton.Enabled then StopButtonClick(Sender);
       Ord('M'): SoundButtonClick(Sender);
     end;
     Exit;
   end;
 
   // ход с клавиатуры: буква вертикали, затем цифра горизонтали (в том числе на цифровом блоке)
-  if not SpeedButton2.Down and not SpeedButton1.Down
+  if not WhiteModeButton.Down and not BlackModeButton.Down
     and (InRange(Key, $41, $48) or InRange(Key, $61, $69) or InRange(Key, $31, $38)) then
   begin
     Signal;
@@ -1010,10 +1015,10 @@ begin
       or CheckStep(Side, Form1.Tag - $41 + 1, Digit, 0, Idx, Fin)) then
     begin
       if Flipped then
-        Image1MouseDown(Sender, mbLeft, [], (7 - (Form1.Tag - $41)) * 50 + 25,
+        BoardImageMouseDown(Sender, mbLeft, [], (7 - (Form1.Tag - $41)) * 50 + 25,
           (Digit - 1) * 50 + 25)
       else
-        Image1MouseDown(Sender, mbLeft, [], (Form1.Tag - $41) * 50 + 25,
+        BoardImageMouseDown(Sender, mbLeft, [], (Form1.Tag - $41) * 50 + 25,
           (8 - Digit) * 50 + 25);
     end;
     Form1.Tag := 0;
@@ -1027,17 +1032,17 @@ begin
 end;
 
 { Остановка: снимает режим игры; во время перебора просит его прерваться. }
-procedure TForm1.SpeedButton10Click(Sender: TObject);
+procedure TForm1.StopButtonClick(Sender: TObject);
 begin
-  Image1.Cursor := crTransparent;
-  SpeedButton1.Enabled := True;
-  SpeedButton2.Enabled := True;
-  SpeedButton3.Enabled := True;
-  SpeedButton4.Enabled := True;
-  SpeedButton5.Enabled := True;
-  SpeedButton9.Enabled := True;
+  BoardImage.Cursor := crTransparent;
+  BlackModeButton.Enabled := True;
+  WhiteModeButton.Enabled := True;
+  AutoModeButton.Enabled := True;
+  NewGameButton.Enabled := True;
+  ColorsButton.Enabled := True;
+  PoddavkiButton.Enabled := True;
   BlinkTimer.Enabled := False;
-  Reserve.Down := True;
+  NoModeButton.Down := True;
   DrawBoard;
   if Thinking then
     ShowBoard(SaveBoard)
@@ -1045,52 +1050,52 @@ begin
     ShowBoard(Board);
   if Thinking then
     StopSearch := True
-  else if SpeedButton1.Down or SpeedButton2.Down then
+  else if BlackModeButton.Down or WhiteModeButton.Down then
   begin
-    if Timer3.Enabled then
-      Timer3Timer(Sender);
+    if PauseTimer.Enabled then
+      PauseTimerTimer(Sender);
   end
   else
     StopSearch := True;
 end;
 
-procedure TForm1.SpeedButton3MouseDown(Sender: TObject; Button: TMouseButton;
+procedure TForm1.AutoModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if not SpeedButton3.Down then
+  if not AutoModeButton.Down then
   begin
-    SpeedButton3.Down := True;
-    SpeedButton1.Enabled := False;
-    SpeedButton2.Enabled := False;
-    SpeedButton4.Enabled := False;
-    SpeedButton5.Enabled := False;
-    SpeedButton9.Enabled := False;
+    AutoModeButton.Down := True;
+    BlackModeButton.Enabled := False;
+    WhiteModeButton.Enabled := False;
+    NewGameButton.Enabled := False;
+    ColorsButton.Enabled := False;
+    PoddavkiButton.Enabled := False;
     StopSearch := False;
     BlinkTimer.Enabled := False;
     if not Thinking then
-      Timer3.Enabled := True;
+      PauseTimer.Enabled := True;
   end;
 end;
 
-procedure TForm1.SpeedButton4Click(Sender: TObject);
+procedure TForm1.NewGameButtonClick(Sender: TObject);
 begin
-  Timer1.Enabled := False;
-  Timer2.Enabled := False;
-  Timer3.Enabled := False;
+  WhiteTimer.Enabled := False;
+  BlackTimer.Enabled := False;
+  PauseTimer.Enabled := False;
   BlinkTimer.Enabled := False;
   DrawBoard;
   NewBoard;
   ShowBoard(Board);
-  Timer3.Tag := 2;
+  PauseTimer.Tag := 2;
   StopSearch := False;
-  if SpeedButton1.Down or SpeedButton3.Down then
-    Timer1.Enabled := True;
+  if BlackModeButton.Down or AutoModeButton.Down then
+    WhiteTimer.Enabled := True;
 end;
 
-procedure TForm1.SpeedButton5Click(Sender: TObject);
+procedure TForm1.ColorsButtonClick(Sender: TObject);
 begin
-  Reserve.Down := True;
-  Form2.Image4.Picture := Image6.Picture;
+  NoModeButton.Down := True;
+  Form2.Image4.Picture := BackImage.Picture;
   Form2.ShowModal;
   DrawBoard;
   ShowBoard(Board);
@@ -1099,7 +1104,7 @@ begin
     CreateBlinkFish;
 end;
 
-procedure TForm1.SpeedButton6Click(Sender: TObject);
+procedure TForm1.FlipButtonClick(Sender: TObject);
 begin
   Flipped := not Flipped;
   DrawBoard;
@@ -1107,39 +1112,39 @@ begin
     ShowBoard(SaveBoard)
   else
     ShowBoard(Board);
-  Image1.Repaint;
+  BoardImage.Repaint;
 end;
 
 { Перетаскивание окна без рамки за полосу заголовка. }
-procedure TForm1.Image7MouseDown(Sender: TObject; Button: TMouseButton;
+procedure TForm1.TitleImageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   ReleaseCapture;
   SendMessage(Handle, WM_SYSCOMMAND, $F012, 0);
 end;
 
-procedure TForm1.SpeedButton8Click(Sender: TObject);
+procedure TForm1.CloseButtonClick(Sender: TObject);
 begin
   Close;
 end;
 
 { Игра за белых: компьютер играет чёрными. }
-procedure TForm1.SpeedButton2MouseDown(Sender: TObject; Button: TMouseButton;
+procedure TForm1.WhiteModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if not SpeedButton2.Down then
+  if not WhiteModeButton.Down then
   begin
-    SpeedButton2.Down := True;
-    SpeedButton4.Enabled := False;
-    SpeedButton5.Enabled := False;
-    SpeedButton9.Enabled := False;
+    WhiteModeButton.Down := True;
+    NewGameButton.Enabled := False;
+    ColorsButton.Enabled := False;
+    PoddavkiButton.Enabled := False;
     BlinkTimer.Enabled := False;
     Flipped := False;
     DrawBoard;
     ShowBoard(Board);
     StopSearch := False;
-    if Timer3.Tag = 1 then
-      Timer2.Enabled := True
+    if PauseTimer.Tag = 1 then
+      BlackTimer.Enabled := True
     else
     begin
       Step := 0;
@@ -1150,22 +1155,22 @@ begin
 end;
 
 { Игра за чёрных: компьютер играет белыми, доска переворачивается. }
-procedure TForm1.SpeedButton1MouseDown(Sender: TObject; Button: TMouseButton;
+procedure TForm1.BlackModeButtonMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if not SpeedButton1.Down then
+  if not BlackModeButton.Down then
   begin
-    SpeedButton1.Down := True;
-    SpeedButton4.Enabled := False;
-    SpeedButton5.Enabled := False;
-    SpeedButton9.Enabled := False;
+    BlackModeButton.Down := True;
+    NewGameButton.Enabled := False;
+    ColorsButton.Enabled := False;
+    PoddavkiButton.Enabled := False;
     BlinkTimer.Enabled := False;
     Flipped := True;
     DrawBoard;
     ShowBoard(Board);
     StopSearch := False;
-    if Timer3.Tag <> 1 then
-      Timer1.Enabled := True
+    if PauseTimer.Tag <> 1 then
+      WhiteTimer.Enabled := True
     else
     begin
       Step := 0;
@@ -1175,31 +1180,31 @@ begin
   end;
 end;
 
-procedure TForm1.SpeedButton9Click(Sender: TObject);
+procedure TForm1.PoddavkiButtonClick(Sender: TObject);
 begin
-  Timer3.Tag := 2;
+  PauseTimer.Tag := 2;
   if Poddavki = 1 then
   begin
     Poddavki := 0;
-    SpeedButton9.Hint := 'Поддавки Ctrl+G';
+    PoddavkiButton.Hint := 'Поддавки Ctrl+G';
     Application.Title := 'Шашки';
     Title.Caption := 'Шашки';
-    SpeedButton9.Glyph := Smile2.Picture.Bitmap;
+    PoddavkiButton.Glyph := Smile2.Picture.Bitmap;
   end
   else if Poddavki = 0 then
   begin
     Poddavki := 1;
-    SpeedButton9.Hint := 'Шашки Ctrl+G';
+    PoddavkiButton.Hint := 'Шашки Ctrl+G';
     Application.Title := 'Поддавки';
     Title.Caption := 'Поддавки';
-    SpeedButton9.Glyph := Smile1.Picture.Bitmap;
+    PoddavkiButton.Glyph := Smile1.Picture.Bitmap;
   end;
   NewBoard;
   DrawBoard;
   ShowBoard(Board);
 end;
 
-procedure TForm1.SpeedButton7Click(Sender: TObject);
+procedure TForm1.AboutButtonClick(Sender: TObject);
 begin
   ShowMsg('         Р.Ш.Мухутдинов, ВМК, 2003 г.      ');
 end;
@@ -1216,24 +1221,24 @@ procedure TForm1.StatusBlackMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if [ssCtrl, ssRight, ssDouble] <= Shift then
-    BlackPopup.Popup(Form1.Left + Panel3.Left + StatusBlack.Left + X,
-      Form1.Top + Panel3.Top + StatusBlack.Top + Y);
+    BlackPopup.Popup(Form1.Left + ScorePanel.Left + StatusBlack.Left + X,
+      Form1.Top + ScorePanel.Top + StatusBlack.Top + Y);
 end;
 
 procedure TForm1.StatusWhiteMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if [ssCtrl, ssRight, ssDouble] <= Shift then
-    WhitePopup.Popup(Form1.Left + Panel3.Left + StatusWhite.Left + X,
-      Form1.Top + Panel3.Top + StatusWhite.Top + Y);
+    WhitePopup.Popup(Form1.Left + ScorePanel.Left + StatusWhite.Left + X,
+      Form1.Top + ScorePanel.Top + StatusWhite.Top + Y);
 end;
 
 { Ход компьютера за сторону Side в режиме Mode (человек играет другой стороной) или в игре
   с самим собой. Кнопка режима другой стороны (Other) на время раздумья недоступна. Ходить
-  нечем — конец партии; иначе пауза с подсвеченным путём (Timer3). }
+  нечем — конец партии; иначе пауза с подсвеченным путём (PauseTimer). }
 procedure TForm1.ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
 begin
-  if not (Mode.Down or SpeedButton3.Down) then
+  if not (Mode.Down or AutoModeButton.Down) then
     Exit;
   if CheckDraw then
     Exit;
@@ -1252,42 +1257,42 @@ begin
     StopSearch := False;
     Exit;
   end;
-  Timer3.Tag := Side;
-  Timer3.Enabled := True;
+  PauseTimer.Tag := Side;
+  PauseTimer.Enabled := True;
 end;
 
 { Ход компьютера за белых. }
-procedure TForm1.Timer1Timer(Sender: TObject);
+procedure TForm1.WhiteTimerTimer(Sender: TObject);
 begin
-  Timer1.Enabled := False;
-  ComputerTurn(1, SpeedButton1, SpeedButton2);
+  WhiteTimer.Enabled := False;
+  ComputerTurn(1, BlackModeButton, WhiteModeButton);
 end;
 
 { Ход компьютера за чёрных. }
-procedure TForm1.Timer2Timer(Sender: TObject);
+procedure TForm1.BlackTimerTimer(Sender: TObject);
 begin
-  Timer2.Enabled := False;
-  ComputerTurn(2, SpeedButton2, SpeedButton1);
+  BlackTimer.Enabled := False;
+  ComputerTurn(2, WhiteModeButton, BlackModeButton);
 end;
 
 { Конец паузы после хода компьютера: снимает подсветку и передаёт ход. }
-procedure TForm1.Timer3Timer(Sender: TObject);
+procedure TForm1.PauseTimerTimer(Sender: TObject);
 var
   Human: Integer;
 begin
-  Timer3.Enabled := False;
+  PauseTimer.Enabled := False;
   DrawBoard;
   ShowBoard(Board);
-  if not SpeedButton3.Down then
+  if not AutoModeButton.Down then
   begin
-    SpeedButton1.Enabled := True;
-    SpeedButton2.Enabled := True;
+    BlackModeButton.Enabled := True;
+    WhiteModeButton.Enabled := True;
   end;
   if CheckDraw then
     Exit;
-  if SpeedButton1.Down then
+  if BlackModeButton.Down then
     Human := 2
-  else if SpeedButton2.Down then
+  else if WhiteModeButton.Down then
     Human := 1
   else
     Human := 0;
@@ -1309,10 +1314,10 @@ begin
     StopSearch := False;
     Exit;
   end;
-  if Timer3.Tag = 1 then
-    Timer2.Enabled := True
+  if PauseTimer.Tag = 1 then
+    BlackTimer.Enabled := True
   else
-    Timer1.Enabled := True;
+    WhiteTimer.Enabled := True;
 end;
 
 { Мигание выбранной фигуры: 16 тактов от фигуры к клетке и обратно. }
@@ -1333,7 +1338,7 @@ begin
   if Step > 1 then
   begin
     // при взятии шашка, прошедшая последнюю горизонталь, мигает дамкой
-    if Timer3.Tag <> 1 then
+    if PauseTimer.Tag <> 1 then
     begin
       k := 1;
       V := Board[Paths[1, 1].X, Paths[1, 1].Y];
@@ -1363,13 +1368,13 @@ begin
   else
     V := Board[BlinkX, BlinkY];
   case V of
-    1: Image1.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
+    1: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
         FrameW[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
-    2: Image1.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
+    2: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
         FrameB[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
-    11: Image1.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
+    11: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
         FrameW2[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
-    12: Image1.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
+    12: BoardImage.Canvas.StretchDraw(Rect(L, T, L + 50, T + 50),
         FrameB2[Abs(8 - BlinkTimer.Tag)].Picture.Graphic);
   end;
   if BlinkTimer.Tag = 15 then
@@ -1399,7 +1404,7 @@ begin
 end;
 
 { Подсветка координат под курсором и вид курсора: можно ли сходить на это поле. }
-procedure TForm1.Image1MouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+procedure TForm1.BoardImageMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var
   CX, CY, k, Col, Row, Idx, Side: Integer;
   Fin: Boolean;
@@ -1446,13 +1451,13 @@ begin
   Side := HumanToMove;
   if Side <> 0 then
     if CheckStep(Side, CX, CY, Step, Idx, Fin) or CheckStep(Side, CX, CY, 0, Idx, Fin) then
-      Image1.Cursor := crEnabled
+      BoardImage.Cursor := crEnabled
     else
-      Image1.Cursor := crTransparent;
+      BoardImage.Cursor := crTransparent;
 end;
 
 { Ход игрока щелчками: фигура, затем поля пути по одному. Щелчок мимо сбрасывает выбор. }
-procedure TForm1.Image1MouseDown(Sender: TObject; Button: TMouseButton;
+procedure TForm1.BoardImageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 
   procedure HumanClick(Side, CX, CY: Integer);
@@ -1472,7 +1477,7 @@ procedure TForm1.Image1MouseDown(Sender: TObject; Button: TMouseButton;
         end;
       end
       else
-        Image1.Cursor := crTransparent;
+        BoardImage.Cursor := crTransparent;
       Paths[Side, Step + 1].X := CX;
       Paths[Side, Step + 1].Y := CY;
       if (CX <> BlinkX) or (CY <> BlinkY) or not BlinkTimer.Enabled then
@@ -1489,13 +1494,13 @@ procedure TForm1.Image1MouseDown(Sender: TObject; Button: TMouseButton;
         ShowBoard(Board);
         if Side = 2 then
         begin
-          Timer3.Tag := 2;
-          Timer1.Enabled := True;
+          PauseTimer.Tag := 2;
+          WhiteTimer.Enabled := True;
         end
         else
         begin
-          Timer3.Tag := 1;
-          Timer2.Enabled := True;
+          PauseTimer.Tag := 1;
+          BlackTimer.Enabled := True;
         end;
       end;
     end
@@ -1505,7 +1510,7 @@ procedure TForm1.Image1MouseDown(Sender: TObject; Button: TMouseButton;
       Step := 0;
       DrawBoard;
       ShowBoard(Board);
-      Image1MouseMove(Sender, [], X, Y);
+      BoardImageMouseMove(Sender, [], X, Y);
     end;
   end;
 

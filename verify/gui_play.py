@@ -28,7 +28,7 @@ user32.PostMessageW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
 user32.SendMessageW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
 
 WM_GETTEXT, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_COMMAND, IDOK = 0x000D, 0x0201, 0x0202, 0x0111, 1
-MODE_BUTTON = {"auto": (502, 64), "white": (502, 96), "black": (502, 128)}  # на Panel1
+MODE_BUTTON = {"auto": (502, 64), "white": (502, 96), "black": (502, 128)}  # на MainPanel
 HUMAN_SIDE = {"white": 1, "black": 2}
 
 
@@ -116,7 +116,7 @@ def positions(log):
 
 
 def square_point(x, y, flipped):
-    """Точка на Panel2 в центре поля (x, y): картинка доски стоит в Panel2 со сдвигом 1."""
+    """Точка на BoardPanel в центре поля (x, y): картинка доски стоит в BoardPanel со сдвигом 1."""
     if flipped:
         return 1 + (8 - x) * 50 + 25, 1 + (y - 1) * 50 + 25
     return 1 + (x - 1) * 50 + 25, 1 + (8 - y) * 50 + 25

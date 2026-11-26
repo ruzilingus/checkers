@@ -16,7 +16,7 @@ object Form1: TForm1
   OnKeyDown = FormKeyDown
   OnShow = FormShow
   KeyPreview = True
-  object Panel1: TPanel
+  object MainPanel: TPanel
     Left = 0
     Top = 0
     Width = 561
@@ -24,13 +24,13 @@ object Form1: TForm1
     AutoSize = True
     BorderWidth = 1
     TabOrder = 0
-    object Image6: TImage
+    object BackImage: TImage
       Left = 2
       Top = 2
       Width = 557
       Height = 487
     end
-    object Bevel4: TBevel
+    object StopBevel: TBevel
       Left = 471
       Top = 178
       Width = 63
@@ -38,7 +38,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object SpeedButton10: TSpeedButton
+    object StopButton: TSpeedButton
       Left = 473
       Top = 180
       Width = 59
@@ -93,9 +93,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnClick = SpeedButton10Click
+      OnClick = StopButtonClick
     end
-    object Bevel1: TBevel
+    object AutoModeBevel: TBevel
       Left = 471
       Top = 50
       Width = 63
@@ -103,7 +103,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object SpeedButton3: TSpeedButton
+    object AutoModeButton: TSpeedButton
       Left = 473
       Top = 52
       Width = 59
@@ -151,9 +151,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnMouseDown = SpeedButton3MouseDown
+      OnMouseDown = AutoModeButtonMouseDown
     end
-    object Reserve: TSpeedButton
+    object NoModeButton: TSpeedButton
       Left = 473
       Top = 20
       Width = 59
@@ -168,7 +168,7 @@ object Form1: TForm1
       ParentFont = False
       Visible = False
     end
-    object Bevel6: TBevel
+    object NewGameBevel: TBevel
       Left = 471
       Top = 146
       Width = 63
@@ -176,7 +176,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object SpeedButton4: TSpeedButton
+    object NewGameButton: TSpeedButton
       Left = 473
       Top = 148
       Width = 59
@@ -219,9 +219,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnClick = SpeedButton4Click
+      OnClick = NewGameButtonClick
     end
-    object Bevel7: TBevel
+    object ColorsBevel: TBevel
       Left = 471
       Top = 210
       Width = 63
@@ -229,7 +229,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object SpeedButton5: TSpeedButton
+    object ColorsButton: TSpeedButton
       Left = 473
       Top = 212
       Width = 59
@@ -281,9 +281,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnClick = SpeedButton5Click
+      OnClick = ColorsButtonClick
     end
-    object Bevel8: TBevel
+    object FlipBevel: TBevel
       Left = 471
       Top = 242
       Width = 63
@@ -291,7 +291,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object SpeedButton6: TSpeedButton
+    object FlipButton: TSpeedButton
       Left = 473
       Top = 244
       Width = 59
@@ -342,9 +342,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnClick = SpeedButton6Click
+      OnClick = FlipButtonClick
     end
-    object Bevel9: TBevel
+    object PoddavkiBevel: TBevel
       Left = 471
       Top = 274
       Width = 63
@@ -352,7 +352,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object Image7: TImage
+    object TitleImage: TImage
       Left = 2
       Top = 2
       Width = 557
@@ -451,7 +451,7 @@ object Form1: TForm1
         9A0492AB1512B73DF033FCA8A2A9218F68A4C806791BAF563FE34E580673C648
         1FC345149948FFD9
       }
-      OnMouseDown = Image7MouseDown
+      OnMouseDown = TitleImageMouseDown
     end
     object Title: TLabel
       Left = 24
@@ -467,9 +467,9 @@ object Form1: TForm1
       ParentFont = False
       Transparent = True
       WordWrap = True
-      OnMouseDown = Image7MouseDown
+      OnMouseDown = TitleImageMouseDown
     end
-    object SpeedButton8: TSpeedButton
+    object CloseButton: TSpeedButton
       Left = 541
       Top = 4
       Width = 16
@@ -493,17 +493,17 @@ object Form1: TForm1
         FFFFFF0000FF0000FF0000FF0000FF0000FF0000FF0000FF0000FF0000FF0000
         FF0000FF0000FF0000FF
       }
-      OnClick = SpeedButton8Click
+      OnClick = CloseButtonClick
     end
-    object Image8: TImage
+    object IconImage: TImage
       Left = 4
       Top = 3
       Width = 18
       Height = 18
       Transparent = True
-      OnMouseDown = Image7MouseDown
+      OnMouseDown = TitleImageMouseDown
     end
-    object Bevel2: TBevel
+    object WhiteModeBevel: TBevel
       Left = 471
       Top = 82
       Width = 63
@@ -511,7 +511,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object Bevel3: TBevel
+    object BlackModeBevel: TBevel
       Left = 471
       Top = 114
       Width = 63
@@ -519,7 +519,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object SpeedButton2: TSpeedButton
+    object WhiteModeButton: TSpeedButton
       Left = 473
       Top = 84
       Width = 59
@@ -536,9 +536,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnMouseDown = SpeedButton2MouseDown
+      OnMouseDown = WhiteModeButtonMouseDown
     end
-    object SpeedButton1: TSpeedButton
+    object BlackModeButton: TSpeedButton
       Left = 473
       Top = 116
       Width = 59
@@ -586,9 +586,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnMouseDown = SpeedButton1MouseDown
+      OnMouseDown = BlackModeButtonMouseDown
     end
-    object Bevel5: TBevel
+    object AboutBevel: TBevel
       Left = 471
       Top = 306
       Width = 63
@@ -596,7 +596,7 @@ object Form1: TForm1
       Shape = bsFrame
       Style = bsRaised
     end
-    object SpeedButton9: TSpeedButton
+    object PoddavkiButton: TSpeedButton
       Left = 473
       Top = 276
       Width = 59
@@ -613,9 +613,9 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnClick = SpeedButton9Click
+      OnClick = PoddavkiButtonClick
     end
-    object SpeedButton7: TSpeedButton
+    object AboutButton: TSpeedButton
       Left = 473
       Top = 308
       Width = 59
@@ -666,7 +666,7 @@ object Form1: TForm1
       ParentFont = False
       ParentShowHint = False
       ShowHint = True
-      OnClick = SpeedButton7Click
+      OnClick = AboutButtonClick
     end
     object SoundBevel: TBevel
       Left = 471
@@ -687,13 +687,13 @@ object Form1: TForm1
       ShowHint = True
       OnClick = SoundButtonClick
     end
-    object Panel2: TPanel
+    object BoardPanel: TPanel
       Left = 34
       Top = 50
       Width = 402
       Height = 402
       TabOrder = 0
-      object White: TImage
+      object LightSquare: TImage
         Left = 8
         Top = 8
         Width = 50
@@ -701,7 +701,7 @@ object Form1: TForm1
         AutoSize = True
         Visible = False
       end
-      object Black: TImage
+      object DarkSquare: TImage
         Left = 64
         Top = 8
         Width = 50
@@ -1142,7 +1142,7 @@ object Form1: TForm1
         Visible = False
       end
     end
-    object Panel3: TPanel
+    object ScorePanel: TPanel
       Left = 472
       Top = 339
       Width = 63
@@ -1150,7 +1150,7 @@ object Form1: TForm1
       BevelInner = bvRaised
       BevelOuter = bvLowered
       TabOrder = 1
-      object Image9: TImage
+      object ScoreBackImage: TImage
         Left = 2
         Top = 2
         Width = 59
@@ -1186,25 +1186,25 @@ object Form1: TForm1
       end
     end
   end
-  object Timer1: TTimer
+  object WhiteTimer: TTimer
     Enabled = False
     Interval = 1
-    OnTimer = Timer1Timer
+    OnTimer = WhiteTimerTimer
     Left = 64
     Top = 304
   end
-  object Timer2: TTimer
+  object BlackTimer: TTimer
     Enabled = False
     Interval = 1
-    OnTimer = Timer2Timer
+    OnTimer = BlackTimerTimer
     Left = 96
     Top = 304
   end
-  object Timer3: TTimer
+  object PauseTimer: TTimer
     Tag = 2
     Enabled = False
     Interval = 700
-    OnTimer = Timer3Timer
+    OnTimer = PauseTimerTimer
     Left = 128
     Top = 304
   end
