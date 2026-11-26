@@ -102,7 +102,7 @@ begin
     Cnt := RootCount(Side, Lv);
     H := HashBytes(H, @Best, SizeOf(Best));
     H := HashBytes(H, @Cnt, SizeOf(Cnt));
-    H := HashBytes(H, @RootValues(Side)^[1], SizeOf(Integer) * Cnt);
+    H := HashBytes(H, @RootValues[Side][1], SizeOf(Integer) * Cnt);
     if c mod SearchBlock = 0 then
     begin
       Lines.Add(Format('search %d..%d, levels 1-%d: hash %s',

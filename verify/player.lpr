@@ -30,30 +30,30 @@ begin
   Saved := Board;
   Best := Search(Side, Lv);
   Board := Saved;
-  CaptureMoves(Side, CapCnt[Side], CapList(Side)^);
+  CaptureMoves(Side, CapCnt[Side], CapList[Side]);
   if CapCnt[Side] = 0 then
   begin
-    SimpleMoves(Side, SimCnt[Side], SimList(Side)^);
+    SimpleMoves(Side, SimCnt[Side], SimList[Side]);
     if SimCnt[Side] = 0 then
       Exit(False);
-    ApplySimple(Side, SimList(Side)^[PickRootMove(Side, SimCnt[Side], Best)]);
+    ApplySimple(Side, SimList[Side][PickRootMove(Side, SimCnt[Side], Best)]);
   end
   else
-    ApplyCapture(Side, CapList(Side)^[PickRootMove(Side, CapCnt[Side], Best)]);
+    ApplyCapture(Side, CapList[Side][PickRootMove(Side, CapCnt[Side], Best)]);
   Result := True;
 end;
 
 function RandomMove(Side: Integer): Boolean;
 begin
-  CaptureMoves(Side, CapCnt[Side], CapList(Side)^);
+  CaptureMoves(Side, CapCnt[Side], CapList[Side]);
   if CapCnt[Side] > 0 then
-    ApplyCapture(Side, CapList(Side)^[DRandom(CapCnt[Side]) + 1])
+    ApplyCapture(Side, CapList[Side][DRandom(CapCnt[Side]) + 1])
   else
   begin
-    SimpleMoves(Side, SimCnt[Side], SimList(Side)^);
+    SimpleMoves(Side, SimCnt[Side], SimList[Side]);
     if SimCnt[Side] = 0 then
       Exit(False);
-    ApplySimple(Side, SimList(Side)^[DRandom(SimCnt[Side]) + 1]);
+    ApplySimple(Side, SimList[Side][DRandom(SimCnt[Side]) + 1]);
   end;
   Result := True;
 end;
@@ -64,10 +64,10 @@ var
   i, t: Integer;
 begin
   Result := '';
-  CaptureMoves(Side, CapCnt[Side], CapList(Side)^);
+  CaptureMoves(Side, CapCnt[Side], CapList[Side]);
   if CapCnt[Side] > 0 then
     for i := 1 to CapCnt[Side] do
-      with CapList(Side)^[i] do
+      with CapList[Side][i] do
       begin
         if Result <> '' then
           Result := Result + ' ';
@@ -77,9 +77,9 @@ begin
       end
   else
   begin
-    SimpleMoves(Side, SimCnt[Side], SimList(Side)^);
+    SimpleMoves(Side, SimCnt[Side], SimList[Side]);
     for i := 1 to SimCnt[Side] do
-      with SimList(Side)^[i] do
+      with SimList[Side][i] do
       begin
         if Result <> '' then
           Result := Result + ' ';

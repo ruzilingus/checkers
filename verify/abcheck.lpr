@@ -33,14 +33,14 @@ begin
     BestF := FullSearch(Side, Lv);
     n1 := RootCount(Side, Lv);
     for i := 1 to n1 do
-      CandF[i] := RootValues(Side)^[i] = BestF;
+      CandF[i] := RootValues[Side][i] = BestF;
     Board := Saved;
     BestA := Search(Side, Lv);
     n2 := RootCount(Side, Lv);
     Same := (BestA = BestF) and (n1 = n2);
     if Same then
       for i := 1 to n1 do
-        if CandF[i] <> (RootValues(Side)^[i] = BestA) then
+        if CandF[i] <> (RootValues[Side][i] = BestA) then
           Same := False;
     if not Same then
     begin

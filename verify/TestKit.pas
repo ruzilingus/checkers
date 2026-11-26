@@ -85,10 +85,10 @@ end;
   есть, иначе простых. }
 function RootCount(Side, Depth: Integer): Integer;
 begin
-  if CapCntD(Side, Depth)^ > 0 then
-    Result := CapCntD(Side, Depth)^
+  if CapCntD[Side, Depth] > 0 then
+    Result := CapCntD[Side, Depth]
   else
-    Result := SimCntD(Side, Depth)^;
+    Result := SimCntD[Side, Depth];
 end;
 
 end.

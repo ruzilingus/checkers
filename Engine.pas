@@ -56,17 +56,6 @@ type
   PSimpleList = ^TSimpleList;
   PIntList = ^TIntList;
 
-  { Все списки ходов: ходы стороны, которая ходит сейчас (игрока или корня перебора), оценки
-    ходов корня, затем списки по глубине перебора. }
-  TMoveArea = record
-    CapB, CapW: TMoveList;
-    SimB, SimW: TSimpleList;
-    ValuesW, ValuesB: TIntList;
-    CapCntDB, CapCntDW, SimCntDB, SimCntDW: array[1..MaxDepth] of Integer;
-    CapDB, CapDW: array[1..MaxDepth] of TMoveList;
-    SimDB, SimDW: array[1..MaxDepth] of TSimpleList;
-  end;
-
 var
   Board: TBoard;
 
@@ -77,10 +66,17 @@ var
   WhiteLevel: Integer = 6;
   BlackLevel: Integer = 6;
 
-  { Число ходов стороны, которая ходит сейчас (сами ходы — CapList, SimList). }
-  CapCnt: array[1..2] of Integer;
-  SimCnt: array[1..2] of Integer;
-  Area: TMoveArea;
+  { Списки ходов по номеру стороны. Ходы стороны, которая ходит сейчас (игрока или после
+    перебора — компьютера): число взятий и простых ходов, сами ходы; оценки ходов корня
+    последнего перебора — в RootValues, на тех же местах, что ходы в списке. }
+  CapCnt, SimCnt: array[1..2] of Integer;
+  CapList: array[1..2] of TMoveList;
+  SimList: array[1..2] of TSimpleList;
+  RootValues: array[1..2] of TIntList;
+  { Ходы узлов перебора: [сторона, глубина]. }
+  CapCntD, SimCntD: array[1..2, 1..MaxDepth] of Integer;
+  CapListD: array[1..2, 1..MaxDepth] of TMoveList;
+  SimListD: array[1..2, 1..MaxDepth] of TSimpleList;
 
   { Датчик случайных чисел Delphi 5: тот же ряд, что в программе 2003 года. }
   DRandSeed: LongWord;
@@ -109,71 +105,8 @@ procedure UndoSimple(const M: TSimpleMove; Piece: Integer); inline;
 function Search(Side, Depth: Integer): Integer;
 function FullSearch(Side, Depth: Integer): Integer;
 function PickRootMove(Side, Count, Best: Integer): Integer;
-function CapList(Side: Integer): PMoveList;
-function SimList(Side: Integer): PSimpleList;
-function RootValues(Side: Integer): PIntList;
-function CapListD(Side, Depth: Integer): PMoveList;
-function SimListD(Side, Depth: Integer): PSimpleList;
-function CapCntD(Side, Depth: Integer): PInteger;
-function SimCntD(Side, Depth: Integer): PInteger;
 
 implementation
-
-function CapList(Side: Integer): PMoveList;
-begin
-  if Side = 1 then
-    Result := @Area.CapW
-  else
-    Result := @Area.CapB;
-end;
-
-function SimList(Side: Integer): PSimpleList;
-begin
-  if Side = 1 then
-    Result := @Area.SimW
-  else
-    Result := @Area.SimB;
-end;
-
-function RootValues(Side: Integer): PIntList;
-begin
-  if Side = 1 then
-    Result := @Area.ValuesW
-  else
-    Result := @Area.ValuesB;
-end;
-
-function CapListD(Side, Depth: Integer): PMoveList;
-begin
-  if Side = 1 then
-    Result := @Area.CapDW[Depth]
-  else
-    Result := @Area.CapDB[Depth];
-end;
-
-function SimListD(Side, Depth: Integer): PSimpleList;
-begin
-  if Side = 1 then
-    Result := @Area.SimDW[Depth]
-  else
-    Result := @Area.SimDB[Depth];
-end;
-
-function CapCntD(Side, Depth: Integer): PInteger;
-begin
-  if Side = 1 then
-    Result := @Area.CapCntDW[Depth]
-  else
-    Result := @Area.CapCntDB[Depth];
-end;
-
-function SimCntD(Side, Depth: Integer): PInteger;
-begin
-  if Side = 1 then
-    Result := @Area.SimCntDW[Depth]
-  else
-    Result := @Area.SimCntDB[Depth];
-end;
 
 procedure DRandomize;
 var
@@ -817,26 +750,26 @@ var
   Mv: TSimpleMove;
 begin
   Opp := 3 - Side;
-  CaptureMoves(Opp, CapCntD(Opp, Depth)^, CapListD(Opp, Depth)^);
+  CaptureMoves(Opp, CapCntD[Opp, Depth], CapListD[Opp, Depth]);
   Result := Inf;
-  for r := 1 to CapCntD(Opp, Depth)^ do
+  for r := 1 to CapCntD[Opp, Depth] do
   begin
     CopyBoard(Save2, Board);
-    ApplyCapture(Opp, CapListD(Opp, Depth)^[r]);
+    ApplyCapture(Opp, CapListD[Opp, Depth][r]);
     if Depth = 1 then
       Result := Min(Result, QMax(Side, -Inf - 1, Inf + 1, 1))
     else
       Result := Min(Result, FullSearch(Side, Depth - 1));
     CopyBoard(Board, Save2);
   end;
-  if CapCntD(Opp, Depth)^ = 0 then
+  if CapCntD[Opp, Depth] = 0 then
   begin
-    SimpleMoves(Opp, SimCntD(Opp, Depth)^, SimListD(Opp, Depth)^);
-    if (SimCntD(Opp, Depth)^ = 0) and (Poddavki = 1) then
+    SimpleMoves(Opp, SimCntD[Opp, Depth], SimListD[Opp, Depth]);
+    if (SimCntD[Opp, Depth] = 0) and (Poddavki = 1) then
       Result := -Inf;
-    for r := 1 to SimCntD(Opp, Depth)^ do
+    for r := 1 to SimCntD[Opp, Depth] do
     begin
-      Mv := SimListD(Opp, Depth)^[r];
+      Mv := SimListD[Opp, Depth][r];
       Piece := Board[Mv.FX, Mv.FY];
       ApplySimple(Opp, Mv);
       if Depth = 1 then
@@ -861,31 +794,31 @@ begin
   SearchPoll;
   if Closing or StopSearch then
     Exit;
-  CaptureMoves(Side, CapCntD(Side, Depth)^, CapListD(Side, Depth)^);
-  if CapCntD(Side, Depth)^ > 0 then
-    for m := 1 to CapCntD(Side, Depth)^ do
+  CaptureMoves(Side, CapCntD[Side, Depth], CapListD[Side, Depth]);
+  if CapCntD[Side, Depth] > 0 then
+    for m := 1 to CapCntD[Side, Depth] do
     begin
       CopyBoard(Save1, Board);
-      ApplyCapture(Side, CapListD(Side, Depth)^[m]);
+      ApplyCapture(Side, CapListD[Side, Depth][m]);
       V := ReplyValue(Side, Depth);
       if Depth = Level(Side) then
-        RootValues(Side)^[m] := V;
+        RootValues[Side][m] := V;
       Result := Max(Result, V);
       CopyBoard(Board, Save1);
     end
   else
   begin
-    SimpleMoves(Side, SimCntD(Side, Depth)^, SimListD(Side, Depth)^);
-    if (SimCntD(Side, Depth)^ = 0) and (Poddavki = 1) then
+    SimpleMoves(Side, SimCntD[Side, Depth], SimListD[Side, Depth]);
+    if (SimCntD[Side, Depth] = 0) and (Poddavki = 1) then
       Result := Inf;
-    for m := 1 to SimCntD(Side, Depth)^ do
+    for m := 1 to SimCntD[Side, Depth] do
     begin
-      Mv := SimListD(Side, Depth)^[m];
+      Mv := SimListD[Side, Depth][m];
       Piece := Board[Mv.FX, Mv.FY];
       ApplySimple(Side, Mv);
       V := ReplyValue(Side, Depth);
       if Depth = Level(Side) then
-        RootValues(Side)^[m] := V;
+        RootValues[Side][m] := V;
       Result := Max(Result, V);
       UndoSimple(Mv, Piece);
     end;
@@ -1146,14 +1079,14 @@ begin
   Beta0 := Beta;
   Best.FX := 0;
   Opp := 3 - Side;
-  CaptureMoves(Opp, CapCntD(Opp, Depth)^, CapListD(Opp, Depth)^);
+  CaptureMoves(Opp, CapCntD[Opp, Depth], CapListD[Opp, Depth]);
   Result := Inf;
-  if CapCntD(Opp, Depth)^ > 0 then
+  if CapCntD[Opp, Depth] > 0 then
   begin
-    for r := 1 to CapCntD(Opp, Depth)^ do
+    for r := 1 to CapCntD[Opp, Depth] do
     begin
       CopyBoard(Save2, Board);
-      ApplyCapture(Opp, CapListD(Opp, Depth)^[r]);
+      ApplyCapture(Opp, CapListD[Opp, Depth][r]);
       if Depth = 1 then
         V := QMax(Side, Alpha, Beta, 1)
       else
@@ -1167,14 +1100,14 @@ begin
   end
   else
   begin
-    SimpleMoves(Opp, SimCntD(Opp, Depth)^, SimListD(Opp, Depth)^);
-    if (SimCntD(Opp, Depth)^ = 0) and (Poddavki = 1) then
+    SimpleMoves(Opp, SimCntD[Opp, Depth], SimListD[Opp, Depth]);
+    if (SimCntD[Opp, Depth] = 0) and (Poddavki = 1) then
       Result := -Inf;
-    ScoreMoves(SimListD(Opp, Depth)^, SimCntD(Opp, Depth)^, Opp, True, Depth, First);
-    for r := 1 to SimCntD(Opp, Depth)^ do
+    ScoreMoves(SimListD[Opp, Depth], SimCntD[Opp, Depth], Opp, True, Depth, First);
+    for r := 1 to SimCntD[Opp, Depth] do
     begin
-      PickMove(SimListD(Opp, Depth)^, True, Depth, r, SimCntD(Opp, Depth)^);
-      Mv := SimListD(Opp, Depth)^[r];
+      PickMove(SimListD[Opp, Depth], True, Depth, r, SimCntD[Opp, Depth]);
+      Mv := SimListD[Opp, Depth][r];
       Piece := Board[Mv.FX, Mv.FY];
       ApplySimple(Opp, Mv);
       if Depth = 1 then
@@ -1214,13 +1147,13 @@ begin
   Alpha0 := Alpha;
   Beta0 := Beta;
   Best.FX := 0;
-  CaptureMoves(Side, CapCntD(Side, Depth)^, CapListD(Side, Depth)^);
-  if CapCntD(Side, Depth)^ > 0 then
+  CaptureMoves(Side, CapCntD[Side, Depth], CapListD[Side, Depth]);
+  if CapCntD[Side, Depth] > 0 then
   begin
-    for m := 1 to CapCntD(Side, Depth)^ do
+    for m := 1 to CapCntD[Side, Depth] do
     begin
       CopyBoard(Save1, Board);
-      ApplyCapture(Side, CapListD(Side, Depth)^[m]);
+      ApplyCapture(Side, CapListD[Side, Depth][m]);
       V := ABReply(Side, Depth, Alpha, Beta);
       CopyBoard(Board, Save1);
       Result := Max(Result, V);
@@ -1231,14 +1164,14 @@ begin
   end
   else
   begin
-    SimpleMoves(Side, SimCntD(Side, Depth)^, SimListD(Side, Depth)^);
-    if (SimCntD(Side, Depth)^ = 0) and (Poddavki = 1) then
+    SimpleMoves(Side, SimCntD[Side, Depth], SimListD[Side, Depth]);
+    if (SimCntD[Side, Depth] = 0) and (Poddavki = 1) then
       Result := Inf;
-    ScoreMoves(SimListD(Side, Depth)^, SimCntD(Side, Depth)^, Side, False, Depth, First);
-    for m := 1 to SimCntD(Side, Depth)^ do
+    ScoreMoves(SimListD[Side, Depth], SimCntD[Side, Depth], Side, False, Depth, First);
+    for m := 1 to SimCntD[Side, Depth] do
     begin
-      PickMove(SimListD(Side, Depth)^, False, Depth, m, SimCntD(Side, Depth)^);
-      Mv := SimListD(Side, Depth)^[m];
+      PickMove(SimListD[Side, Depth], False, Depth, m, SimCntD[Side, Depth]);
+      Mv := SimListD[Side, Depth][m];
       Piece := Board[Mv.FX, Mv.FY];
       ApplySimple(Side, Mv);
       V := ABReply(Side, Depth, Alpha, Beta);
@@ -1279,20 +1212,20 @@ begin
   SearchPoll;
   if Closing or StopSearch then
     Exit;
-  CaptureMoves(Side, CapCntD(Side, Depth)^, CapListD(Side, Depth)^);
-  Caps := CapCntD(Side, Depth)^ > 0;
+  CaptureMoves(Side, CapCntD[Side, Depth], CapListD[Side, Depth]);
+  Caps := CapCntD[Side, Depth] > 0;
   if Caps then
-    n := CapCntD(Side, Depth)^
+    n := CapCntD[Side, Depth]
   else
   begin
-    SimpleMoves(Side, SimCntD(Side, Depth)^, SimListD(Side, Depth)^);
-    n := SimCntD(Side, Depth)^;
+    SimpleMoves(Side, SimCntD[Side, Depth], SimListD[Side, Depth]);
+    n := SimCntD[Side, Depth];
     if (n = 0) and (Poddavki = 1) then
       Result := Inf;
   end;
   if n = 0 then
     Exit;
-  Vals := RootValues(Side);
+  Vals := @RootValues[Side];
   for k := 1 to n do
     Order[k] := k;
   for d := 1 to Depth do
@@ -1318,9 +1251,9 @@ begin
       m := Order[k];
       CopyBoard(Save1, Board);
       if Caps then
-        ApplyCapture(Side, CapListD(Side, Depth)^[m])
+        ApplyCapture(Side, CapListD[Side, Depth][m])
       else
-        ApplySimple(Side, SimListD(Side, Depth)^[m]);
+        ApplySimple(Side, SimListD[Side, Depth][m]);
       V := ABReply(Side, d, Result - 1, Inf + 1);
       Vals^[m] := V;
       Result := Max(Result, V);
@@ -1345,7 +1278,7 @@ var
 begin
   n := 0;
   for i := 1 to Count do
-    if RootValues(Side)^[i] = Best then
+    if RootValues[Side][i] = Best then
     begin
       Inc(n);
       Cand[n] := i;

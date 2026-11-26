@@ -197,12 +197,12 @@ begin
   S := Format('ROOT %d %d', [Side, Count]);
   for i := 1 to Count do
     if IsCapture then
-      with CapList(Side)^[i] do
+      with CapList[Side][i] do
         S := S + Format(' %d%d-%d%d=%d', [Path[0].X, Path[0].Y, Path[Len].X, Path[Len].Y,
-          RootValues(Side)^[i]])
+          RootValues[Side][i]])
     else
-      with SimList(Side)^[i] do
-        S := S + Format(' %d%d-%d%d=%d', [FX, FY, TX, TY, RootValues(Side)^[i]]);
+      with SimList[Side][i] do
+        S := S + Format(' %d%d-%d%d=%d', [FX, FY, TX, TY, RootValues[Side][i]]);
   AssignFile(F, LogFileName);
   if FileExists(LogFileName) then
     Append(F)
@@ -445,8 +445,8 @@ begin
     Step := 0;
     if SpeedButton2.Down then
     begin
-      CaptureMoves(1, CapCnt[1], CapList(1)^);
-      SimpleMoves(1, SimCnt[1], SimList(1)^);
+      CaptureMoves(1, CapCnt[1], CapList[1]);
+      SimpleMoves(1, SimCnt[1], SimList[1]);
     end
     else
       Timer1.Enabled := True;
@@ -498,26 +498,26 @@ begin
   if StopSearch then
     Exit;
   CopyBoard(Board, SaveBoard);
-  CaptureMoves(Side, CapCnt[Side], CapList(Side)^);
+  CaptureMoves(Side, CapCnt[Side], CapList[Side]);
   if CapCnt[Side] = 0 then
   begin
-    SimpleMoves(Side, SimCnt[Side], SimList(Side)^);
+    SimpleMoves(Side, SimCnt[Side], SimList[Side]);
     if SimCnt[Side] = 0 then
       Exit(False);
     LogRoot(Side, False, SimCnt[Side]);
     k := PickRootMove(Side, SimCnt[Side], BestV);
-    with SimList(Side)^[k] do
+    with SimList[Side][k] do
       MarkPath(FX, FY, TX, TY);
-    ApplySimple(Side, SimList(Side)^[k]);
+    ApplySimple(Side, SimList[Side][k]);
   end
   else
   begin
     LogRoot(Side, True, CapCnt[Side]);
     k := PickRootMove(Side, CapCnt[Side], BestV);
-    with CapList(Side)^[k] do
+    with CapList[Side][k] do
       for t := 1 to Len do
         MarkPath(Path[t - 1].X, Path[t - 1].Y, Path[t].X, Path[t].Y);
-    ApplyCapture(Side, CapList(Side)^[k]);
+    ApplyCapture(Side, CapList[Side][k]);
   end;
 end;
 
@@ -537,15 +537,15 @@ begin
       i := 1;
       while (i <= SimCnt[Side]) and not Result do
       begin
-        if (AStep = 0) and (SimList(Side)^[i].FX = X) and (SimList(Side)^[i].FY = Y) then
+        if (AStep = 0) and (SimList[Side][i].FX = X) and (SimList[Side][i].FY = Y) then
         begin
           Result := True;
           Final := False;
           Index := i;
         end;
-        if (AStep = 1) and (SimList(Side)^[i].TX = X) and (SimList(Side)^[i].TY = Y)
-          and (SimList(Side)^[i].FX = Paths[Side, AStep].X)
-          and (SimList(Side)^[i].FY = Paths[Side, AStep].Y) then
+        if (AStep = 1) and (SimList[Side][i].TX = X) and (SimList[Side][i].TY = Y)
+          and (SimList[Side][i].FX = Paths[Side, AStep].X)
+          and (SimList[Side][i].FY = Paths[Side, AStep].Y) then
         begin
           Result := True;
           Final := True;
@@ -562,13 +562,13 @@ begin
     begin
       Result := True;
       for k := 1 to AStep do
-        if (CapList(Side)^[i].Path[k - 1].X <> Paths[Side, k].X)
-          or (CapList(Side)^[i].Path[k - 1].Y <> Paths[Side, k].Y) then
+        if (CapList[Side][i].Path[k - 1].X <> Paths[Side, k].X)
+          or (CapList[Side][i].Path[k - 1].Y <> Paths[Side, k].Y) then
           Result := False;
-      if (CapList(Side)^[i].Path[AStep].X <> X) or (CapList(Side)^[i].Path[AStep].Y <> Y) then
+      if (CapList[Side][i].Path[AStep].X <> X) or (CapList[Side][i].Path[AStep].Y <> Y) then
         Result := False;
       Index := i;
-      Final := AStep = CapList(Side)^[i].Len;
+      Final := AStep = CapList[Side][i].Len;
       Inc(i);
     end;
   end;
@@ -577,9 +577,9 @@ end;
 procedure ApplyHumanMove(Side, Index: Integer);
 begin
   if CapCnt[Side] = 0 then
-    ApplySimple(Side, SimList(Side)^[Index])
+    ApplySimple(Side, SimList[Side][Index])
   else
-    ApplyCapture(Side, CapList(Side)^[Index]);
+    ApplyCapture(Side, CapList[Side][Index]);
 end;
 
 procedure StartBlink(X, Y: Integer);
@@ -772,8 +772,8 @@ begin
   NewBoard;
   ShowBoard(Board);
   Step := 0;
-  CaptureMoves(1, CapCnt[1], CapList(1)^);
-  SimpleMoves(1, SimCnt[1], SimList(1)^);
+  CaptureMoves(1, CapCnt[1], CapList[1]);
+  SimpleMoves(1, SimCnt[1], SimList[1]);
 end;
 
 procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -880,10 +880,10 @@ begin
     MoveNo := MoveNo - 2;
     DrawBoard;
     ShowBoard(Board);
-    CaptureMoves(1, CapCnt[1], CapList(1)^);
-    CaptureMoves(2, CapCnt[2], CapList(2)^);
-    SimpleMoves(1, SimCnt[1], SimList(1)^);
-    SimpleMoves(2, SimCnt[2], SimList(2)^);
+    CaptureMoves(1, CapCnt[1], CapList[1]);
+    CaptureMoves(2, CapCnt[2], CapList[2]);
+    SimpleMoves(1, SimCnt[1], SimList[1]);
+    SimpleMoves(2, SimCnt[2], SimList[2]);
     Image1.Repaint;
     Key := VK_ESCAPE;
   end;
@@ -894,10 +894,10 @@ begin
     MoveNo := MoveNo - 2;
     DrawBoard;
     ShowBoard(Board);
-    CaptureMoves(1, CapCnt[1], CapList(1)^);
-    CaptureMoves(2, CapCnt[2], CapList(2)^);
-    SimpleMoves(1, SimCnt[1], SimList(1)^);
-    SimpleMoves(2, SimCnt[2], SimList(2)^);
+    CaptureMoves(1, CapCnt[1], CapList[1]);
+    CaptureMoves(2, CapCnt[2], CapList[2]);
+    SimpleMoves(1, SimCnt[1], SimList[1]);
+    SimpleMoves(2, SimCnt[2], SimList[2]);
     Image1.Repaint;
     Timer3.Tag := 2;
     if SpeedButton1.Down then
@@ -1080,8 +1080,8 @@ begin
     else
     begin
       Step := 0;
-      CaptureMoves(1, CapCnt[1], CapList(1)^);
-      SimpleMoves(1, SimCnt[1], SimList(1)^);
+      CaptureMoves(1, CapCnt[1], CapList[1]);
+      SimpleMoves(1, SimCnt[1], SimList[1]);
     end;
   end;
 end;
@@ -1106,8 +1106,8 @@ begin
     else
     begin
       Step := 0;
-      CaptureMoves(2, CapCnt[2], CapList(2)^);
-      SimpleMoves(2, SimCnt[2], SimList(2)^);
+      CaptureMoves(2, CapCnt[2], CapList[2]);
+      SimpleMoves(2, SimCnt[2], SimList[2]);
     end;
   end;
 end;
@@ -1225,8 +1225,8 @@ begin
   begin
     Beep;
     Step := 0;
-    CaptureMoves(Human, CapCnt[Human], CapList(Human)^);
-    SimpleMoves(Human, SimCnt[Human], SimList(Human)^);
+    CaptureMoves(Human, CapCnt[Human], CapList[Human]);
+    SimpleMoves(Human, SimCnt[Human], SimList[Human]);
     if (SimCnt[Human] = 0) and (CapCnt[Human] = 0) then
       if Poddavki = 1 then
         EndGame('Вы выиграли!')
