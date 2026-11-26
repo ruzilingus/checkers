@@ -966,7 +966,32 @@ begin
   Inc(TTGen);
 end;
 
-function SameMove(const A, B: TSimpleMove): Boolean;
+{ Ключ позиции после взятия M по ключу Key до него: меняются только клетки «откуда», «куда»
+  (это может быть одна клетка — дамка вернулась на поле) и побитые. Before — доска до взятия,
+  Board — после. }
+function KeyAfterCapture(Key: QWord; const Before: TBoard; const M: TMove): QWord;
+var
+  k: Integer;
+begin
+  Result := Key;
+  with M.Path[0] do
+    Result := Result xor Zobrist[X, Y, Before[X, Y]] xor Zobrist[X, Y, Board[X, Y]];
+  with M.Path[M.Len] do
+    if (X <> M.Path[0].X) or (Y <> M.Path[0].Y) then
+      Result := Result xor Zobrist[X, Y, Before[X, Y]] xor Zobrist[X, Y, Board[X, Y]];
+  for k := 1 to M.Len do
+    with M.Caps[k] do
+      Result := Result xor Zobrist[X, Y, Before[X, Y]] xor Zobrist[X, Y, Board[X, Y]];
+end;
+
+{ Ключ позиции после простого хода M по ключу Key до него; Piece — фигура, которая ходила,
+  Board — доска после хода. }
+function KeyAfterSimple(Key: QWord; const M: TSimpleMove; Piece: Integer): QWord; inline;
+begin
+  Result := Key xor Zobrist[M.FX, M.FY, Piece] xor Zobrist[M.TX, M.TY, Board[M.TX, M.TY]];
+end;
+
+function SameMove(const A, B: TSimpleMove): Boolean; inline;
 begin
   Result := (A.FX = B.FX) and (A.FY = B.FY) and (A.TX = B.TX) and (A.TY = B.TY);
 end;
@@ -1043,23 +1068,24 @@ end;
   (-Beta, -Alpha), так что максимум и минимум считает одна функция. Reply — узел ответа
   соперника стороне корня: после него глубина уменьшается, а на глубине 1 начинается
   доигрывание взятий; у него свой ключ в таблице транспозиций (ZReply) и свои ходы-убийцы.
-  Окно опрашивается и перебор прерывается в узлах стороны корня. }
-function ABNode(Mover, Depth, Alpha, Beta: Integer; Reply: Boolean): Integer;
+  PosKey — ключ позиции (BoardKey): у детей он считается по клеткам, которые изменил ход, а не
+  обходом всей доски. Окно опрашивается и перебор прерывается в узлах стороны корня. }
+function ABNode(Mover, Depth, Alpha, Beta: Integer; Reply: Boolean; PosKey: QWord): Integer;
 var
   m, Count, Piece, V, Alpha0, Beta0: Integer;
   Save: TBoard;
-  Key: QWord;
+  Key, ChildKey: QWord;
   First, Best, Mv: TSimpleMove;
 
-  { Оценка для Mover позиции после его хода. }
+  { Оценка для Mover позиции после его хода; ChildKey — её ключ. }
   function Child: Integer;
   begin
     if not Reply then
-      Result := -ABNode(3 - Mover, Depth, -Beta, -Alpha, True)
+      Result := -ABNode(3 - Mover, Depth, -Beta, -Alpha, True, ChildKey)
     else if Depth = 1 then
       Result := -QSearch(3 - Mover, -Beta, -Alpha, 1)
     else
-      Result := -ABNode(3 - Mover, Depth - 1, -Beta, -Alpha, False);
+      Result := -ABNode(3 - Mover, Depth - 1, -Beta, -Alpha, False, ChildKey);
   end;
 
 begin
@@ -1070,7 +1096,14 @@ begin
     if Closing or StopSearch then
       Exit;
   end;
-  Key := BoardKey;
+  {$IFDEF CHECKKEY}
+  if PosKey <> BoardKey then
+  begin
+    WriteLn('KEY MISMATCH');
+    Halt(3);
+  end;
+  {$ENDIF}
+  Key := PosKey;
   if Reply then
     Key := Key xor ZReply;
   if TTProbe(Key, Depth, Alpha, Beta, V, First) then
@@ -1086,6 +1119,7 @@ begin
     begin
       CopyBoard(Save, Board);
       ApplyCapture(Mover, CapListD[Mover, Depth][m]);
+      ChildKey := KeyAfterCapture(PosKey, Save, CapListD[Mover, Depth][m]);
       V := Child;
       CopyBoard(Board, Save);
       Result := Max(Result, V);
@@ -1107,6 +1141,7 @@ begin
       Mv := SimListD[Mover, Depth][m];
       Piece := Board[Mv.FX, Mv.FY];
       ApplySimple(Mover, Mv);
+      ChildKey := KeyAfterSimple(PosKey, Mv, Piece);
       V := Child;
       UndoSimple(Mv, Piece);
       if (m = 1) or (V > Result) then
@@ -1132,11 +1167,12 @@ end;
   отсекаются быстрее. Оценки пишутся на места ходов в списке, номера ходов не меняются. }
 function ABRoot(Side, Depth: Integer): Integer;
 var
-  m, k, d, n, t, V: Integer;
+  m, k, d, n, t, V, Piece: Integer;
   Caps: Boolean;
   Save1: TBoard;
   Order: TIntList;
   Vals: PIntList;
+  RootKey, ChildKey: QWord;
 begin
   Result := -Inf;
   FillChar(Killers, SizeOf(Killers), 0);
@@ -1145,6 +1181,7 @@ begin
   SearchPoll;
   if Closing or StopSearch then
     Exit;
+  RootKey := BoardKey;  // дальше ключи узлов считаются по изменённым клеткам
   CaptureMoves(Side, CapCntD[Side, Depth], CapListD[Side, Depth]);
   Caps := CapCntD[Side, Depth] > 0;
   if Caps then
@@ -1184,10 +1221,18 @@ begin
       m := Order[k];
       CopyBoard(Save1, Board);
       if Caps then
-        ApplyCapture(Side, CapListD[Side, Depth][m])
+      begin
+        ApplyCapture(Side, CapListD[Side, Depth][m]);
+        ChildKey := KeyAfterCapture(RootKey, Save1, CapListD[Side, Depth][m]);
+      end
       else
+      begin
+        with SimListD[Side, Depth][m] do
+          Piece := Board[FX, FY];
         ApplySimple(Side, SimListD[Side, Depth][m]);
-      V := -ABNode(3 - Side, d, -Inf - 1, 1 - Result, True);
+        ChildKey := KeyAfterSimple(RootKey, SimListD[Side, Depth][m], Piece);
+      end;
+      V := -ABNode(3 - Side, d, -Inf - 1, 1 - Result, True, ChildKey);
       Vals^[m] := V;
       Result := Max(Result, V);
       CopyBoard(Board, Save1);
