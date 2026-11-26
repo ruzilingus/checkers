@@ -5,7 +5,7 @@ unit Unit1;
 
   Ходы игрока и компьютера идут через таймеры: WhiteTimer — ход компьютера за белых,
   BlackTimer — за чёрных (оба — ComputerTurn), PauseTimer — пауза после хода компьютера с
-  подсвеченным путём, затем ход человека или компьютера. PauseTimer.Tag хранит, кто ходил
+  подсвеченным путём, затем ход человека или компьютера. LastMover хранит, кто ходил
   последним: 1 — белые (ходят чёрные), 2 — чёрные (ходят белые). Сейчас ли ход человека —
   HumanToMove; конец партии (проигрыш или ничья) — EndGame. }
 
@@ -130,6 +130,7 @@ type
     procedure ActiveFormChanged(Sender: TObject);
     procedure ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
     procedure UndoMove(Sender: TObject);
+    function HumanStepTo(Side, CX, CY: Integer): Boolean;
   end;
 
 var
@@ -162,7 +163,12 @@ var
   { Ход игрока, набираемый щелчками: Step — число отмеченных полей, Paths — сами поля. }
   Step: Integer;
   Paths: array[1..2, 1..MaxJumps + 1] of TSq;
-  BlinkX, BlinkY: Integer;
+  BlinkX, BlinkY: Integer;  // мигающее поле
+  BlinkPhase: Integer;      // такт мигания: 0..15
+  PendingColumn: Integer;   // вертикаль, набранная буквой с клавиатуры (1..8); 0 — нет
+
+  { Кто ходил последним: 1 — белые (ходят чёрные), 2 — чёрные (ходят белые). }
+  LastMover: Integer = 2;
 
   { Кадры мигания выбранной фигуры: [фигура, кадр], кадр — от клетки (0) до фигуры (8).
     Заняты строки фигур 1, 2, 11, 12, остальные пусты. }
@@ -307,16 +313,16 @@ begin
     begin
       DigLeft[i].Caption := IntToStr(9 - i);
       DigRight[i].Caption := IntToStr(9 - i);
-      LetTop[i].Caption := Chr($69 - i);
-      LetBottom[i].Caption := Chr($69 - i);
+      LetTop[i].Caption := Chr(Ord('a') + 8 - i);
+      LetBottom[i].Caption := Chr(Ord('a') + 8 - i);
     end
   else
     for i := 1 to 8 do
     begin
       DigLeft[i].Caption := IntToStr(i);
       DigRight[i].Caption := IntToStr(i);
-      LetTop[i].Caption := Chr($61 + i - 1);
-      LetBottom[i].Caption := Chr($61 + i - 1);
+      LetTop[i].Caption := Chr(Ord('a') + i - 1);
+      LetBottom[i].Caption := Chr(Ord('a') + i - 1);
     end;
 end;
 
@@ -534,7 +540,7 @@ begin
     DrawBoard;
     NewBoard;
     ShowBoard(Board);
-    PauseTimer.Tag := 2;
+    LastMover := 2;
     Step := 0;
     if WhiteModeButton.Down then
     begin
@@ -569,9 +575,9 @@ begin
   Result := 0;
   with Form1 do
     if not WhiteTimer.Enabled and not BlackTimer.Enabled and not PauseTimer.Enabled then
-      if BlackModeButton.Down and (PauseTimer.Tag = 1) then
+      if BlackModeButton.Down and (LastMover = 1) then
         Result := 2
-      else if WhiteModeButton.Down and (PauseTimer.Tag <> 1) then
+      else if WhiteModeButton.Down and (LastMover <> 1) then
         Result := 1;
 end;
 
@@ -667,6 +673,28 @@ begin
   end;
 end;
 
+{ Можно ли сейчас отметить поле (X, Y) стороной Side: очередным полем набираемого хода или
+  началом нового. Index и Final — как у CheckStep. }
+function CanStep(Side, X, Y: Integer; out Index: Integer; out Final: Boolean): Boolean;
+begin
+  Result := CheckStep(Side, X, Y, Step, Index, Final) or CheckStep(Side, X, Y, 0, Index, Final);
+end;
+
+{ Поле под точкой (X, Y) картинки доски с учётом переворота; вне доски — номера за 1..8. }
+procedure PointToSquare(X, Y: Integer; out CX, CY: Integer);
+begin
+  if Flipped then
+  begin
+    CX := (399 - X) div 50 + 1;
+    CY := 8 - (399 - Y) div 50;
+  end
+  else
+  begin
+    CX := X div 50 + 1;
+    CY := 8 - Y div 50;
+  end;
+end;
+
 procedure ApplyHumanMove(Side, Index: Integer);
 begin
   if CapCnt[Side] = 0 then
@@ -679,7 +707,7 @@ procedure StartBlink(X, Y: Integer);
 begin
   BlinkX := X;
   BlinkY := Y;
-  Form1.BlinkTimer.Tag := 0;
+  BlinkPhase := 0;
   Form1.BlinkTimer.Enabled := True;
 end;
 
@@ -688,27 +716,56 @@ begin
   Form1.BlinkTimer.Enabled := False;
 end;
 
-{ TRuzilImage }
+{ Сброс набираемого хода: мигание и отмеченные поля. }
+procedure CancelMove;
+begin
+  StopBlink;
+  Step := 0;
+  DrawBoard;
+  ShowBoard(Board);
+end;
 
-procedure TRuzilImage.CMMouseLeave(var Message: TLMessage);
+{ Подсвечивает подписи вертикали Col и горизонтали Row (номера по экрану, слева и снизу),
+  остальные гасит; номер за 1..8 — ничего не подсвечивать. }
+procedure HighlightCoords(Col, Row: Integer);
 var
   k: Integer;
 begin
-  inherited;
-  Form1.BoardImage.Cursor := crTransparent;
   for k := 1 to 8 do
   begin
-    if LetTop[k].Font.Color <> LabelColor then
+    if (LetTop[k].Font.Color <> LabelColor) and (k <> Col) then
     begin
       LetTop[k].Font.Color := LabelColor;
       LetBottom[k].Font.Color := LabelColor;
     end;
-    if DigLeft[k].Font.Color <> LabelColor then
+    if (DigLeft[k].Font.Color <> LabelColor) and (k <> Row) then
     begin
       DigLeft[k].Font.Color := LabelColor;
       DigRight[k].Font.Color := LabelColor;
     end;
   end;
+  if (Col in [1..8]) and (Row in [1..8]) then
+  begin
+    if LetTop[Col].Font.Color <> LabelHotColor then
+    begin
+      LetTop[Col].Font.Color := LabelHotColor;
+      LetBottom[Col].Font.Color := LabelHotColor;
+    end;
+    if DigLeft[Row].Font.Color <> LabelHotColor then
+    begin
+      DigLeft[Row].Font.Color := LabelHotColor;
+      DigRight[Row].Font.Color := LabelHotColor;
+    end;
+  end;
+end;
+
+{ TRuzilImage }
+
+procedure TRuzilImage.CMMouseLeave(var Message: TLMessage);
+begin
+  inherited;
+  Form1.BoardImage.Cursor := crTransparent;
+  HighlightCoords(0, 0);
 end;
 
 { Недоступная кнопка в Delphi рисуется рельефной серой картинкой, LCL же почти не меняет
@@ -927,8 +984,8 @@ begin
   begin
     DigLeft[k] := MakeLabel(18, (9 - k) * 50 + 20, 13, IntToStr(k));
     DigRight[k] := MakeLabel(444, (9 - k) * 50 + 20, 13, IntToStr(k));
-    LetTop[k] := MakeLabel(k * 50 + 5, 28, 20, Chr($61 + k - 1));
-    LetBottom[k] := MakeLabel(k * 50 + 5, 453, 20, Chr($61 + k - 1));
+    LetTop[k] := MakeLabel(k * 50 + 5, 28, 20, Chr(Ord('a') + k - 1));
+    LetBottom[k] := MakeLabel(k * 50 + 5, 453, 20, Chr(Ord('a') + k - 1));
   end;
   Screen.Cursors[crTransparent] := LoadCursor(HInstance, 'TRANSPARENTCURSOR');
   Screen.Cursors[crEnabled] := LoadCursor(HInstance, 'ENABLEDCURSOR');
@@ -986,7 +1043,7 @@ begin
   BoardImage.Repaint;
   if ToStart then
   begin
-    PauseTimer.Tag := 2;
+    LastMover := 2;
     if BlackModeButton.Down then
     begin
       NoModeButton.Down := True;
@@ -998,8 +1055,7 @@ end;
 procedure TForm1.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   S: TShiftState;
-  Idx, Digit, Side: Integer;
-  Fin: Boolean;
+  Side: Integer;
 begin
   // в LCL Shift бывает дополнен состоянием Caps/NumLock — сравниваем как в Delphi
   S := Shift * [ssShift, ssAlt, ssCtrl, ssLeft, ssRight, ssMiddle, ssDouble];
@@ -1011,10 +1067,16 @@ begin
     UndoMove(Sender);
     Key := VK_ESCAPE;
   end;
+  // Escape (и после отмены хода): сброс набираемого хода и набранной буквы
   if Key = VK_ESCAPE then
   begin
-    Form1.Tag := 0;
-    BoardImageMouseDown(Sender, mbLeft, [], 444, 444);
+    PendingColumn := 0;
+    if HumanToMove <> 0 then
+    begin
+      CancelMove;
+      HighlightCoords(0, 0);
+      BoardImage.Cursor := crTransparent;
+    end;
   end;
 
   if ssCtrl in S then
@@ -1035,30 +1097,22 @@ begin
 
   // ход с клавиатуры: буква вертикали, затем цифра горизонтали (в том числе на цифровом блоке)
   if not WhiteModeButton.Down and not BlackModeButton.Down
-    and (InRange(Key, $41, $48) or InRange(Key, $61, $69) or InRange(Key, $31, $38)) then
+    and (InRange(Key, Ord('A'), Ord('H')) or InRange(Key, VK_NUMPAD1, VK_NUMPAD9)
+    or InRange(Key, Ord('1'), Ord('8'))) then
   begin
     Signal;
     Exit;
   end;
-  if InRange(Key, $41, $48) then
-    Form1.Tag := Key;
-  if InRange(Key, $61, $69) then
-    Key := Key - $61 + $31;
-  if InRange(Key, $31, $38) and (Form1.Tag <> 0) then
+  if InRange(Key, Ord('A'), Ord('H')) then
+    PendingColumn := Key - Ord('A') + 1;
+  if InRange(Key, VK_NUMPAD1, VK_NUMPAD9) then
+    Key := Key - VK_NUMPAD1 + Ord('1');
+  if InRange(Key, Ord('1'), Ord('8')) and (PendingColumn <> 0) then
   begin
-    Digit := Key - $30;
     Side := HumanToMove;
-    if (Side <> 0) and (CheckStep(Side, Form1.Tag - $41 + 1, Digit, Step, Idx, Fin)
-      or CheckStep(Side, Form1.Tag - $41 + 1, Digit, 0, Idx, Fin)) then
-    begin
-      if Flipped then
-        BoardImageMouseDown(Sender, mbLeft, [], (7 - (Form1.Tag - $41)) * 50 + 25,
-          (Digit - 1) * 50 + 25)
-      else
-        BoardImageMouseDown(Sender, mbLeft, [], (Form1.Tag - $41) * 50 + 25,
-          (8 - Digit) * 50 + 25);
-    end;
-    Form1.Tag := 0;
+    if Side <> 0 then
+      HumanStepTo(Side, PendingColumn, Key - Ord('0'));
+    PendingColumn := 0;
   end;
 end;
 
@@ -1123,7 +1177,7 @@ begin
   DrawBoard;
   NewBoard;
   ShowBoard(Board);
-  PauseTimer.Tag := 2;
+  LastMover := 2;
   StopSearch := False;
   if BlackModeButton.Down or AutoModeButton.Down then
     WhiteTimer.Enabled := True;
@@ -1180,7 +1234,7 @@ begin
     DrawBoard;
     ShowBoard(Board);
     StopSearch := False;
-    if PauseTimer.Tag = 1 then
+    if LastMover = 1 then
       BlackTimer.Enabled := True
     else
     begin
@@ -1206,7 +1260,7 @@ begin
     DrawBoard;
     ShowBoard(Board);
     StopSearch := False;
-    if PauseTimer.Tag <> 1 then
+    if LastMover <> 1 then
       WhiteTimer.Enabled := True
     else
     begin
@@ -1219,7 +1273,7 @@ end;
 
 procedure TForm1.PoddavkiButtonClick(Sender: TObject);
 begin
-  PauseTimer.Tag := 2;
+  LastMover := 2;
   if Poddavki = 1 then
   begin
     Poddavki := 0;
@@ -1294,7 +1348,7 @@ begin
     StopSearch := False;
     Exit;
   end;
-  PauseTimer.Tag := Side;
+  LastMover := Side;
   PauseTimer.Enabled := True;
 end;
 
@@ -1351,7 +1405,7 @@ begin
     StopSearch := False;
     Exit;
   end;
-  if PauseTimer.Tag = 1 then
+  if LastMover = 1 then
     BlackTimer.Enabled := True
   else
     WhiteTimer.Enabled := True;
@@ -1367,7 +1421,7 @@ begin
   begin
     // взятие набирается по полям, а на доске фигура до конца хода стоит на первом поле
     // пути; шашка, побывавшая на горизонтали превращения раньше текущего поля, мигает дамкой
-    if PauseTimer.Tag = 1 then
+    if LastMover = 1 then
       Side := 2
     else
       Side := 1;
@@ -1383,13 +1437,13 @@ begin
     V := Board[BlinkX, BlinkY];
   Frame := nil;
   if (V >= 1) and (V <= 12) then
-    Frame := Frames[V, Abs(8 - BlinkTimer.Tag)];
+    Frame := Frames[V, Abs(8 - BlinkPhase)];
   if Frame <> nil then
     BoardImage.Canvas.StretchDraw(SquareRect(BlinkX, BlinkY), Frame.Picture.Graphic);
-  if BlinkTimer.Tag = 15 then
-    BlinkTimer.Tag := 0
+  if BlinkPhase = 15 then
+    BlinkPhase := 0
   else
-    BlinkTimer.Tag := BlinkTimer.Tag + 1;
+    BlinkPhase := BlinkPhase + 1;
 end;
 
 { Выбор уровня в меню стороны: уровень — номер пункта по порядку, галочка — только на нём. }
@@ -1415,130 +1469,77 @@ end;
 { Подсветка координат под курсором и вид курсора: можно ли сходить на это поле. }
 procedure TForm1.BoardImageMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var
-  CX, CY, k, Col, Row, Idx, Side: Integer;
+  CX, CY, Idx, Side: Integer;
   Fin: Boolean;
 begin
-  if Flipped then
-  begin
-    CX := (399 - X) div 50 + 1;
-    CY := 8 - (399 - Y) div 50;
-  end
-  else
-  begin
-    CX := X div 50 + 1;
-    CY := 8 - Y div 50;
-  end;
-  Col := X div 50 + 1;
-  Row := 8 - Y div 50;
-  for k := 1 to 8 do
-  begin
-    if (LetTop[k].Font.Color <> LabelColor) and (k <> Col) then
-    begin
-      LetTop[k].Font.Color := LabelColor;
-      LetBottom[k].Font.Color := LabelColor;
-    end;
-    if (DigLeft[k].Font.Color <> LabelColor) and (k <> Row) then
-    begin
-      DigLeft[k].Font.Color := LabelColor;
-      DigRight[k].Font.Color := LabelColor;
-    end;
-  end;
-  // вне доски (мышь захвачена кнопкой) подсвечивать нечего
-  if (X <> 444) and (Col in [1..8]) and (Row in [1..8]) then
-  begin
-    if LetTop[Col].Font.Color <> LabelHotColor then
-    begin
-      LetTop[Col].Font.Color := LabelHotColor;
-      LetBottom[Col].Font.Color := LabelHotColor;
-    end;
-    if DigLeft[Row].Font.Color <> LabelHotColor then
-    begin
-      DigLeft[Row].Font.Color := LabelHotColor;
-      DigRight[Row].Font.Color := LabelHotColor;
-    end;
-  end;
+  // вне доски (мышь захвачена кнопкой) номера выходят за 1..8 и подсвечивать нечего
+  HighlightCoords(X div 50 + 1, 8 - Y div 50);
+  PointToSquare(X, Y, CX, CY);
   Side := HumanToMove;
   if Side <> 0 then
-    if CheckStep(Side, CX, CY, Step, Idx, Fin) or CheckStep(Side, CX, CY, 0, Idx, Fin) then
+    if CanStep(Side, CX, CY, Idx, Fin) then
       BoardImage.Cursor := crEnabled
     else
       BoardImage.Cursor := crTransparent;
 end;
 
+{ Отмечает поле (CX, CY) в ходе человека за Side: фигуру — начало нового хода, свободное
+  поле — очередное поле пути; последнее поле делает ход и передаёт ход компьютеру. False —
+  на это поле ходить нельзя, ничего не сделано. }
+function TForm1.HumanStepTo(Side, CX, CY: Integer): Boolean;
+var
+  Idx: Integer;
+  Fin: Boolean;
+begin
+  Result := CanStep(Side, CX, CY, Idx, Fin);
+  if not Result then
+    Exit;
+  if Board[CX, CY] <> 0 then
+  begin
+    Step := 0;
+    if (CX <> BlinkX) or (CY <> BlinkY) then
+    begin
+      DrawBoard;
+      ShowBoard(Board);
+    end;
+  end
+  else
+    BoardImage.Cursor := crTransparent;
+  Paths[Side, Step + 1].X := CX;
+  Paths[Side, Step + 1].Y := CY;
+  if (CX <> BlinkX) or (CY <> BlinkY) or not BlinkTimer.Enabled then
+    StartBlink(CX, CY);
+  if Step > 0 then
+    ErasePath(Paths[Side, Step].X, Paths[Side, Step].Y, Paths[Side, Step].X,
+      Paths[Side, Step].Y);
+  Inc(Step);
+  if Fin then
+  begin
+    StopBlink;
+    ApplyHumanMove(Side, Idx);
+    DrawBoard;
+    ShowBoard(Board);
+    LastMover := Side;
+    if Side = 2 then
+      WhiteTimer.Enabled := True
+    else
+      BlackTimer.Enabled := True;
+  end;
+end;
+
 { Ход игрока щелчками: фигура, затем поля пути по одному. Щелчок мимо сбрасывает выбор. }
 procedure TForm1.BoardImageMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
-
-  procedure HumanClick(Side, CX, CY: Integer);
-  var
-    Idx: Integer;
-    Fin: Boolean;
-  begin
-    if CheckStep(Side, CX, CY, Step, Idx, Fin) or CheckStep(Side, CX, CY, 0, Idx, Fin) then
-    begin
-      if Board[CX, CY] <> 0 then
-      begin
-        Step := 0;
-        if (CX <> BlinkX) or (CY <> BlinkY) then
-        begin
-          DrawBoard;
-          ShowBoard(Board);
-        end;
-      end
-      else
-        BoardImage.Cursor := crTransparent;
-      Paths[Side, Step + 1].X := CX;
-      Paths[Side, Step + 1].Y := CY;
-      if (CX <> BlinkX) or (CY <> BlinkY) or not BlinkTimer.Enabled then
-        StartBlink(CX, CY);
-      if Step > 0 then
-        ErasePath(Paths[Side, Step].X, Paths[Side, Step].Y, Paths[Side, Step].X,
-          Paths[Side, Step].Y);
-      Inc(Step);
-      if Fin then
-      begin
-        StopBlink;
-        ApplyHumanMove(Side, Idx);
-        DrawBoard;
-        ShowBoard(Board);
-        if Side = 2 then
-        begin
-          PauseTimer.Tag := 2;
-          WhiteTimer.Enabled := True;
-        end
-        else
-        begin
-          PauseTimer.Tag := 1;
-          BlackTimer.Enabled := True;
-        end;
-      end;
-    end
-    else
-    begin
-      StopBlink;
-      Step := 0;
-      DrawBoard;
-      ShowBoard(Board);
-      BoardImageMouseMove(Sender, [], X, Y);
-    end;
-  end;
-
 var
   CX, CY, Side: Integer;
 begin
-  if Flipped then
-  begin
-    CX := (399 - X) div 50 + 1;
-    CY := 8 - (399 - Y) div 50;
-  end
-  else
-  begin
-    CX := X div 50 + 1;
-    CY := 8 - Y div 50;
-  end;
+  PointToSquare(X, Y, CX, CY);
   Side := HumanToMove;
-  if Side <> 0 then
-    HumanClick(Side, CX, CY);
+  if (Side <> 0) and not HumanStepTo(Side, CX, CY) then
+  begin
+    CancelMove;
+    BoardImageMouseMove(Sender, [], X, Y);
+  end;
 end;
 
 end.
