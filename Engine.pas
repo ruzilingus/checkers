@@ -95,7 +95,7 @@ procedure InitBoard(var B: TBoard);
 procedure NewBoard;
 function BoardToText(const B: TBoard): string;
 procedure TextToBoard(const S: string; var B: TBoard);
-procedure SideScores(out W, B: Integer);
+procedure SideScores(const Bd: TBoard; out W, B: Integer);
 function Eval(Side: Integer): Integer;
 procedure CaptureMoves(Side: Integer; var Count: Integer; var List: TMoveList);
 procedure SimpleMoves(Side: Integer; var Count: Integer; var List: TSimpleList);
@@ -239,10 +239,10 @@ const
   EvBack = 300;
   EvCenter = 100;
 
-{ Слагаемые оценки за один проход по доске. W и B — фигуры белых и чёрных: шашка 10000 +
+{ Слагаемые оценки за один проход по доске Bd. W и B — фигуры белых и чёрных: шашка 10000 +
   100 за каждую горизонталь от своего края (первая — 100), +1 за каждое свободное поле
   впереди, дамка 30000. PW и PB — охрана тыла и центр. }
-procedure EvalParts(out W, B, PW, PB: Integer); inline;
+procedure EvalParts(const Bd: TBoard; out W, B, PW, PB: Integer); inline;
 var
   i, j: Integer;
 begin
@@ -258,13 +258,13 @@ begin
       j := 1;
     while j < 9 do
     begin
-      case Board[i, j] of
+      case Bd[i, j] of
         1:
           begin
             W := W + 10000 + j * 100;
-            if (i > 1) and (Board[i - 1, j + 1] = 0) then
+            if (i > 1) and (Bd[i - 1, j + 1] = 0) then
               Inc(W);
-            if (i < 8) and (Board[i + 1, j + 1] = 0) then
+            if (i < 8) and (Bd[i + 1, j + 1] = 0) then
               Inc(W);
             if (j = 1) and ((i = 3) or (i = 5)) then
               Inc(PW, EvBack);
@@ -276,9 +276,9 @@ begin
         2:
           begin
             B := B + 10900 - j * 100;
-            if (i > 1) and (Board[i - 1, j - 1] = 0) then
+            if (i > 1) and (Bd[i - 1, j - 1] = 0) then
               Inc(B);
-            if (i < 8) and (Board[i + 1, j - 1] = 0) then
+            if (i < 8) and (Bd[i + 1, j - 1] = 0) then
               Inc(B);
             if (j = 8) and ((i = 4) or (i = 6)) then
               Inc(PB, EvBack);
@@ -293,13 +293,13 @@ begin
   end;
 end;
 
-{ Оценки белых (W) и чёрных (B) по отдельности — для полосок перевеса в окне: только фигуры,
-  в поддавках со знаком минус. }
-procedure SideScores(out W, B: Integer);
+{ Оценки белых (W) и чёрных (B) позиции Bd по отдельности — для полосок перевеса в окне:
+  только фигуры, в поддавках со знаком минус. }
+procedure SideScores(const Bd: TBoard; out W, B: Integer);
 var
   PW, PB: Integer;
 begin
-  EvalParts(W, B, PW, PB);
+  EvalParts(Bd, W, B, PW, PB);
   if Poddavki = 1 then
   begin
     W := -W;
@@ -313,7 +313,7 @@ function Eval(Side: Integer): Integer;
 var
   W, B, PW, PB: Integer;
 begin
-  EvalParts(W, B, PW, PB);
+  EvalParts(Board, W, B, PW, PB);
   if Poddavki = 1 then
   begin
     W := -W;

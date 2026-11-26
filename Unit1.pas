@@ -129,6 +129,7 @@ type
     FLastActiveForm: TCustomForm;
     procedure ActiveFormChanged(Sender: TObject);
     procedure ComputerTurn(Side: Integer; Mode, Other: TSpeedButton);
+    procedure UndoMove(Sender: TObject);
   end;
 
 var
@@ -151,7 +152,8 @@ const
 
 var
   SaveBoard: TBoard;  // позиция на время перебора: на экране показывается она
-  History: array[1..100000] of TBoard;
+  { История партии: History[1..MoveNo] — позиции по порядку, место 0 не используется. }
+  History: array of TBoard;
   MoveNo: Integer;
 
   Flipped: Boolean;     // доска перевёрнута (снизу чёрные)
@@ -332,29 +334,55 @@ begin
   Form1.BoardImage.Canvas.StretchDraw(SquareRect(X, Y), G);
 end;
 
-{ Рисует фигуры позиции, ведёт историю ходов, перекрашивает индикаторы и кнопки режимов
-  под текущий цвет шашек и выставляет высоту полосок перевеса. }
-procedure ShowBoard(const B: TBoard);
+{ Рисует фигуры позиции B поверх клеток. }
+procedure DrawPieces(const B: TBoard);
 var
-  i, j, SW, SB: Integer;
-  Tmp: TBoard;
-  C: TColor;
-  R, G, Bl: Byte;
+  i, j: Integer;
 begin
   Form1.BoardImage.Canvas.Brush.Style := bsSolid;
   for i := 1 to 8 do
     for j := 1 to 8 do
       DrawPiece(i, j, B);
-  InitBoard(Tmp);
-  if BoardsEqual(B, Tmp) then
+end;
+
+{ Добавляет позицию B в историю партии и в журнал (/log), если она новая: начальная
+  позиция начинает историю заново, повтор последней не добавляется. }
+procedure RecordPosition(const B: TBoard);
+var
+  Start: TBoard;
+begin
+  InitBoard(Start);
+  if BoardsEqual(B, Start) then
     MoveNo := 0;
   if (MoveNo = 0) or not BoardsEqual(History[MoveNo], B) then
   begin
     Inc(MoveNo);
+    if MoveNo >= Length(History) then
+      SetLength(History, 2 * Length(History) + 256);
     CopyBoard(History[MoveNo], B);
     LogPosition(B);
   end;
+end;
 
+{ Перекрашивает полоски перевеса и значки кнопок режимов под цвет шашек: белые — цвет фона
+  картинки шашки, сдвинутый множителями ползунков окна цветов, чёрные — его отражение
+  относительно фона. }
+procedure ShowModeColors;
+
+  procedure Fill(Button: TSpeedButton; X, Y: Integer; Color: TColor);
+  begin
+    with Button.Glyph.Canvas do
+    begin
+      Brush.Color := Color;
+      FloodFill(X, Y, clBlack, fsBorder);
+    end;
+  end;
+
+var
+  C, CW, CB: TColor;
+  R, G, Bl: Byte;
+  Auto: TSpeedButton;
+begin
   C := Form1.WhiteFish.Canvas.Pixels[1, 1];
   R := Min(255 - GetRValue(C), GetRValue(C));
   G := Min(255 - GetGValue(C), GetGValue(C));
@@ -362,37 +390,25 @@ begin
   R := Byte(Round(GetRValue(C) + R * (Form2.RedBar.Position / 10)));
   G := Byte(Round(GetGValue(C) + G * (Form2.GreenBar.Position / 10)));
   Bl := Byte(Round(GetBValue(C) + Bl * (Form2.BlueBar.Position / 10)));
-  if TColor(RGB(R, G, Bl)) <> Form1.StatusWhite.Color then
-  begin
-    Form1.StatusWhite.Color := RGB(R, G, Bl);
-    Form1.StatusBlack.Color := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G),
-      Byte(2 * GetBValue(C) - Bl));
-    with Form1.WhiteModeButton.Glyph.Canvas do
-    begin
-      Brush.Color := RGB(R, G, Bl);
-      FloodFill(3, 3, clBlack, fsBorder);
-    end;
-    with Form1.BlackModeButton.Glyph.Canvas do
-    begin
-      Brush.Color := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G),
-        Byte(2 * GetBValue(C) - Bl));
-      FloodFill(3, 3, clBlack, fsBorder);
-    end;
-    with Form1.AutoModeButton.Glyph.Canvas do
-    begin
-      Brush.Color := RGB(R, G, Bl);
-      FloodFill(3, 3, clBlack, fsBorder);
-    end;
-    with Form1.AutoModeButton.Glyph.Canvas do
-    begin
-      Brush.Color := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G),
-        Byte(2 * GetBValue(C) - Bl));
-      FloodFill(Form1.AutoModeButton.Glyph.Width - 3, Form1.AutoModeButton.Glyph.Height - 3,
-        clBlack, fsBorder);
-    end;
-  end;
+  CW := RGB(R, G, Bl);
+  if CW = Form1.StatusWhite.Color then
+    Exit;
+  CB := RGB(Byte(2 * GetRValue(C) - R), Byte(2 * GetGValue(C) - G), Byte(2 * GetBValue(C) - Bl));
+  Form1.StatusWhite.Color := CW;
+  Form1.StatusBlack.Color := CB;
+  Fill(Form1.WhiteModeButton, 3, 3, CW);
+  Fill(Form1.BlackModeButton, 3, 3, CB);
+  Auto := Form1.AutoModeButton;
+  Fill(Auto, 3, 3, CW);
+  Fill(Auto, Auto.Glyph.Width - 3, Auto.Glyph.Height - 3, CB);
+end;
 
-  SideScores(SW, SB);
+{ Высота и подсказки полосок перевеса по оценкам сторон в позиции B. }
+procedure ShowScores(const B: TBoard);
+var
+  SW, SB: Integer;
+begin
+  SideScores(B, SW, SB);
   Form1.StatusWhite.Height := Round(Abs(SW) * 70.58823529411765 / EvalScale);
   Form1.StatusWhite.Top := Form1.ScorePanel.Height - Form1.StatusWhite.Height - 6;
   Form1.StatusBlack.Height := Round(Abs(SB) * 70.58823529411765 / EvalScale);
@@ -400,6 +416,15 @@ begin
   Form1.StatusWhite.Hint := FloatToStrF(SW / EvalScale, ffFixed, 10, 4);
   Form1.StatusBlack.Hint := FloatToStrF(SB / EvalScale, ffFixed, 10, 4);
   Form1.ScorePanel.Repaint;
+end;
+
+{ Показывает позицию B: фигуры, история партии, цвета кнопок режимов, полоски перевеса. }
+procedure ShowBoard(const B: TBoard);
+begin
+  DrawPieces(B);
+  RecordPosition(B);
+  ShowModeColors;
+  ShowScores(B);
 end;
 
 { Подсвечивает путь хода от (X1, Y1) до (X2, Y2) включительно и рисует фигуры поверх. }
@@ -924,6 +949,48 @@ begin
   SearchIdle := IdleProcessMessages;
 end;
 
+{ Отмена хода (Ctrl+Z, Alt+Backspace): ход человека вместе с ответом компьютера — на две
+  позиции назад, промежуточная видна 100 мс. Со второй позиции — к началу партии; если
+  белыми играет компьютер, он ходит заново. Возвращённая позиция заново пишется в журнал
+  (/log): ShowBoard добавляет её в историю под прежним номером. }
+procedure TForm1.UndoMove(Sender: TObject);
+var
+  Target: Integer;
+  ToStart: Boolean;
+begin
+  ToStart := MoveNo = 2;
+  if ToStart then
+    Target := 1
+  else
+  begin
+    Dec(MoveNo);
+    CopyBoard(Board, History[MoveNo]);
+    DrawBoard;
+    ShowBoard(Board);
+    BoardImage.Repaint;
+    Sleep(100);
+    Target := MoveNo - 1;
+  end;
+  CopyBoard(Board, History[Target]);
+  MoveNo := Target - 1;
+  DrawBoard;
+  ShowBoard(Board);
+  CaptureMoves(1, CapCnt[1], CapList[1]);
+  CaptureMoves(2, CapCnt[2], CapList[2]);
+  SimpleMoves(1, SimCnt[1], SimList[1]);
+  SimpleMoves(2, SimCnt[2], SimList[2]);
+  BoardImage.Repaint;
+  if ToStart then
+  begin
+    PauseTimer.Tag := 2;
+    if BlackModeButton.Down then
+    begin
+      NoModeButton.Down := True;
+      BlackModeButtonMouseDown(Sender, mbLeft, [], 1, 1);
+    end;
+  end;
+end;
+
 procedure TForm1.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   S: TShiftState;
@@ -934,44 +1001,10 @@ begin
   S := Shift * [ssShift, ssAlt, ssCtrl, ssLeft, ssRight, ssMiddle, ssDouble];
 
   // отмена хода: Ctrl+Z или Alt+Backspace
-  if BlackModeButton.Enabled and WhiteModeButton.Enabled and (MoveNo > 2)
+  if BlackModeButton.Enabled and WhiteModeButton.Enabled and (MoveNo >= 2)
     and (((Key = VK_BACK) and (S = [ssAlt])) or ((Key = Ord('Z')) and (S = [ssCtrl]))) then
   begin
-    CopyBoard(Board, History[MoveNo - 1]);
-    Dec(MoveNo);
-    DrawBoard;
-    ShowBoard(Board);
-    BoardImage.Repaint;
-    Sleep(100);
-    CopyBoard(Board, History[MoveNo - 1]);
-    MoveNo := MoveNo - 2;
-    DrawBoard;
-    ShowBoard(Board);
-    CaptureMoves(1, CapCnt[1], CapList[1]);
-    CaptureMoves(2, CapCnt[2], CapList[2]);
-    SimpleMoves(1, SimCnt[1], SimList[1]);
-    SimpleMoves(2, SimCnt[2], SimList[2]);
-    BoardImage.Repaint;
-    Key := VK_ESCAPE;
-  end;
-  if BlackModeButton.Enabled and WhiteModeButton.Enabled and (MoveNo = 2)
-    and (((Key = VK_BACK) and (S = [ssAlt])) or ((Key = Ord('Z')) and (S = [ssCtrl]))) then
-  begin
-    CopyBoard(Board, History[MoveNo - 1]);
-    MoveNo := MoveNo - 2;
-    DrawBoard;
-    ShowBoard(Board);
-    CaptureMoves(1, CapCnt[1], CapList[1]);
-    CaptureMoves(2, CapCnt[2], CapList[2]);
-    SimpleMoves(1, SimCnt[1], SimList[1]);
-    SimpleMoves(2, SimCnt[2], SimList[2]);
-    BoardImage.Repaint;
-    PauseTimer.Tag := 2;
-    if BlackModeButton.Down then
-    begin
-      NoModeButton.Down := True;
-      BlackModeButtonMouseDown(Sender, mbLeft, [], 1, 1);
-    end;
+    UndoMove(Sender);
     Key := VK_ESCAPE;
   end;
   if Key = VK_ESCAPE then
