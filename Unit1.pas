@@ -171,26 +171,17 @@ begin
 end;
 
 procedure LogPosition(const B: TBoard);
-const
-  Code: array[0..12] of Char = ('.', 'w', 'b', '?', '?', '?', '?', '?', '?', '?', '?', 'W', 'B');
 var
   F: TextFile;
-  S: string;
-  i, j: Integer;
 begin
   if LogFileName = '' then
     Exit;
-  S := '';
-  for j := 1 to 8 do
-    for i := 1 to 8 do
-      if (i + j) mod 2 = 0 then
-        S := S + Code[B[i, j]];
   AssignFile(F, LogFileName);
   if FileExists(LogFileName) then
     Append(F)
   else
     Rewrite(F);
-  WriteLn(F, MoveNo, ' ', S);
+  WriteLn(F, MoveNo, ' ', BoardToText(B));
   CloseFile(F);
 end;
 
@@ -285,7 +276,7 @@ end;
   под текущий цвет шашек и выставляет высоту полосок перевеса. }
 procedure ShowBoard(const B: TBoard);
 var
-  i, j: Integer;
+  i, j, SW, SB: Integer;
   Tmp: TBoard;
   C: TColor;
   R, G, Bl: Byte;
@@ -341,12 +332,13 @@ begin
     end;
   end;
 
-  Form1.StatusWhite.Height := Round(Abs(EvalWhite) * 70.58823529411765 / EvalScale);
+  SideScores(SW, SB);
+  Form1.StatusWhite.Height := Round(Abs(SW) * 70.58823529411765 / EvalScale);
   Form1.StatusWhite.Top := Form1.Panel3.Height - Form1.StatusWhite.Height - 6;
-  Form1.StatusBlack.Height := Round(Abs(EvalBlack) * 70.58823529411765 / EvalScale);
+  Form1.StatusBlack.Height := Round(Abs(SB) * 70.58823529411765 / EvalScale);
   Form1.StatusBlack.Top := Form1.Panel3.Height - Form1.StatusBlack.Height - 6;
-  Form1.StatusWhite.Hint := FloatToStrF(EvalWhite / EvalScale, ffFixed, 10, 4);
-  Form1.StatusBlack.Hint := FloatToStrF(EvalBlack / EvalScale, ffFixed, 10, 4);
+  Form1.StatusWhite.Hint := FloatToStrF(SW / EvalScale, ffFixed, 10, 4);
+  Form1.StatusBlack.Hint := FloatToStrF(SB / EvalScale, ffFixed, 10, 4);
   Form1.Panel3.Repaint;
 end;
 
@@ -493,12 +485,11 @@ end;
 { Ход компьютера за сторону Side. False — ходить нечем. }
 function ComputerMove(Side: Integer): Boolean;
 var
-  BestV, i, n, k, t: Integer;
+  BestV, k, t: Integer;
 begin
   Result := True;
   if not FixedSeed then
     DRandomize;
-  n := 0;
   CopyBoard(SaveBoard, Board);
   StopSearch := False;
   Thinking := True;
@@ -514,13 +505,7 @@ begin
     if SimCnt[Side] = 0 then
       Exit(False);
     LogRoot(Side, False, SimCnt[Side]);
-    for i := 1 to SimCnt[Side] do
-      if RootValues(Side)^[i] = BestV then
-      begin
-        Inc(n);
-        Area.Candidates[n] := i;
-      end;
-    k := Area.Candidates[DRandom(n) + 1];
+    k := PickRootMove(Side, SimCnt[Side], BestV);
     with SimList(Side)^[k] do
       MarkPath(FX, FY, TX, TY);
     ApplySimple(Side, SimList(Side)^[k]);
@@ -528,13 +513,7 @@ begin
   else
   begin
     LogRoot(Side, True, CapCnt[Side]);
-    for i := 1 to CapCnt[Side] do
-      if RootValues(Side)^[i] = BestV then
-      begin
-        Inc(n);
-        Area.Candidates[n] := i;
-      end;
-    k := Area.Candidates[DRandom(n) + 1];
+    k := PickRootMove(Side, CapCnt[Side], BestV);
     with CapList(Side)^[k] do
       for t := 1 to Len do
         MarkPath(Path[t - 1].X, Path[t - 1].Y, Path[t].X, Path[t].Y);

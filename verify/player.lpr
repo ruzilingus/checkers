@@ -17,52 +17,11 @@ uses
 var
   Freq: Int64;
 
-procedure SetBoard(const S: string);
-var
-  i, j, k: Integer;
-begin
-  k := 1;
-  for j := 1 to 8 do
-    for i := 1 to 8 do
-    begin
-      Board[i, j] := 0;
-      if (i + j) mod 2 = 0 then
-      begin
-        case S[k] of
-          'w': Board[i, j] := 1;
-          'b': Board[i, j] := 2;
-          'W': Board[i, j] := 11;
-          'B': Board[i, j] := 12;
-        end;
-        Inc(k);
-      end;
-    end;
-end;
-
-function GetBoard: string;
-var
-  i, j: Integer;
-begin
-  Result := '';
-  for j := 1 to 8 do
-    for i := 1 to 8 do
-      if (i + j) mod 2 = 0 then
-        case Board[i, j] of
-          1: Result := Result + 'w';
-          2: Result := Result + 'b';
-          11: Result := Result + 'W';
-          12: Result := Result + 'B';
-        else
-          Result := Result + '.';
-        end;
-end;
-
 { Ход компьютера; False — ходить нечем. }
 function EngineMove(Side, Lv: Integer): Boolean;
 var
   Saved: TBoard;
-  Best, n, i, k: Integer;
-  Cand: array[1..400] of Integer;
+  Best: Integer;
 begin
   WhiteLevel := Lv;
   BlackLevel := Lv;
@@ -71,39 +30,16 @@ begin
   Saved := Board;
   Best := Search(Side, Lv);
   Board := Saved;
-  n := 0;
   CaptureMoves(Side, CapCnt[Side], CapList(Side)^);
   if CapCnt[Side] = 0 then
   begin
     SimpleMoves(Side, SimCnt[Side], SimList(Side)^);
     if SimCnt[Side] = 0 then
       Exit(False);
-    for i := 1 to SimCnt[Side] do
-      if RootValues(Side)^[i] = Best then
-      begin
-        Inc(n);
-        Cand[n] := i;
-      end;
-    if n = 0 then
-      k := 1
-    else
-      k := Cand[DRandom(n) + 1];
-    ApplySimple(Side, SimList(Side)^[k]);
+    ApplySimple(Side, SimList(Side)^[PickRootMove(Side, SimCnt[Side], Best)]);
   end
   else
-  begin
-    for i := 1 to CapCnt[Side] do
-      if RootValues(Side)^[i] = Best then
-      begin
-        Inc(n);
-        Cand[n] := i;
-      end;
-    if n = 0 then
-      k := 1
-    else
-      k := Cand[DRandom(n) + 1];
-    ApplyCapture(Side, CapList(Side)^[k]);
-  end;
+    ApplyCapture(Side, CapList(Side)^[PickRootMove(Side, CapCnt[Side], Best)]);
   Result := True;
 end;
 
@@ -167,27 +103,27 @@ begin
     if (Length(P) >= 5) and (P[0] = 'move') then
     begin
       DRandSeed := StrToInt64(P[3]);
-      SetBoard(P[4]);
+      TextToBoard(P[4], Board);
       QueryPerformanceCounter(T0);
       Ok := EngineMove(StrToInt(P[1]), StrToInt(P[2]));
       QueryPerformanceCounter(T1);
       if Ok then
-        WriteLn(GetBoard, ' ', ((T1 - T0) * 1000 div Freq))
+        WriteLn(BoardToText(Board), ' ', ((T1 - T0) * 1000 div Freq))
       else
         WriteLn('none ', ((T1 - T0) * 1000 div Freq));
     end
     else if (Length(P) >= 4) and (P[0] = 'rand') then
     begin
       DRandSeed := StrToInt64(P[2]);
-      SetBoard(P[3]);
+      TextToBoard(P[3], Board);
       if RandomMove(StrToInt(P[1])) then
-        WriteLn(GetBoard)
+        WriteLn(BoardToText(Board))
       else
         WriteLn('none');
     end
     else if (Length(P) >= 3) and (P[0] = 'list') then
     begin
-      SetBoard(P[2]);
+      TextToBoard(P[2], Board);
       WriteLn(ListMoves(StrToInt(P[1])));
     end
     else

@@ -13,7 +13,7 @@ program regress;
 {$Q-}{$R-}
 
 uses
-  Windows, SysUtils, Classes, Engine;
+  Windows, SysUtils, Classes, Engine, TestKit;
 
 const
   CapPositions = 200000;
@@ -25,16 +25,9 @@ const
   FnvPrime = QWord(1099511628211);
 
 var
-  Seed: LongWord = 7;
   Buf: array[1..600] of TMove;
   Lines: TStringList;
   Freq: Int64;
-
-function Rnd(N: Integer): Integer;
-begin
-  Seed := Seed * 1103515245 + 12345;
-  Result := Integer((Seed shr 8) mod LongWord(N));
-end;
 
 function HashBytes(H: QWord; P: PByte; N: Integer): QWord;
 var
@@ -51,69 +44,6 @@ var
 begin
   QueryPerformanceCounter(C);
   Result := C / Freq;
-end;
-
-{ Случайная позиция: до MaxPieces фигур у каждой стороны, треть — дамки; Weird — ещё одна-три
-  клетки со значениями -1 и 10. }
-procedure RandomBoard(MaxPieces: Integer; Weird: Boolean);
-var
-  DX, DY: array[1..32] of Integer;
-  n, i, j, k, Side, Cnt, t, tx, ty: Integer;
-begin
-  n := 0;
-  for j := 1 to 8 do
-    for i := 1 to 8 do
-    begin
-      Board[i, j] := 0;
-      if (i + j) mod 2 = 0 then
-      begin
-        Inc(n);
-        DX[n] := i;
-        DY[n] := j;
-      end;
-    end;
-  for i := 32 downto 2 do
-  begin
-    k := Rnd(i) + 1;
-    tx := DX[i];
-    ty := DY[i];
-    DX[i] := DX[k];
-    DY[i] := DY[k];
-    DX[k] := tx;
-    DY[k] := ty;
-  end;
-  t := 1;
-  for Side := 1 to 2 do
-  begin
-    Cnt := Rnd(MaxPieces) + 1;
-    for k := 1 to Cnt do
-    begin
-      i := DX[t];
-      j := DY[t];
-      Inc(t);
-      if (Rnd(10) < 3) or ((Side = 1) and (j = 8)) or ((Side = 2) and (j = 1)) then
-        Board[i, j] := Side + 10
-      else
-        Board[i, j] := Side;
-    end;
-  end;
-  if Weird then
-    for k := 1 to Rnd(3) + 1 do
-    begin
-      if Rnd(2) = 0 then
-        Board[DX[t], DY[t]] := -1
-      else
-        Board[DX[t], DY[t]] := 10;
-      Inc(t);
-    end;
-end;
-
-function RootCount(Side, Depth: Integer): Integer;
-begin
-  if CapCntD(Side, Depth)^ > 0 then
-    Result := CapCntD(Side, Depth)^
-  else
-    Result := SimCntD(Side, Depth)^;
 end;
 
 procedure CheckCaptures;
@@ -223,6 +153,7 @@ var
 begin
   QueryPerformanceFrequency(Freq);
   SearchIdle := nil;
+  Seed := 7;
   Lines := TStringList.Create;
   try
     Lines.Add('mode ' + ModeName);

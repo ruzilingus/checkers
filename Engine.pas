@@ -57,12 +57,11 @@ type
   PIntList = ^TIntList;
 
   { Все списки ходов: ходы стороны, которая ходит сейчас (игрока или корня перебора), оценки
-    ходов корня и кандидаты на ход, затем списки по глубине перебора. }
+    ходов корня, затем списки по глубине перебора. }
   TMoveArea = record
     CapB, CapW: TMoveList;
     SimB, SimW: TSimpleList;
     ValuesW, ValuesB: TIntList;
-    Candidates: TIntList;
     CapCntDB, CapCntDW, SimCntDB, SimCntDW: array[1..MaxDepth] of Integer;
     CapDB, CapDW: array[1..MaxDepth] of TMoveList;
     SimDB, SimDW: array[1..MaxDepth] of TSimpleList;
@@ -92,21 +91,24 @@ var
 
 procedure DRandomize;
 function DRandom(Range: Integer): Integer;
-function PromoRow(Side: Integer): Integer;
+function PromoRow(Side: Integer): Integer; inline;
 function Level(Side: Integer): Integer;
 procedure CopyBoard(var Dst: TBoard; const Src: TBoard);
 function BoardsEqual(const A, B: TBoard): Boolean;
 procedure InitBoard(var B: TBoard);
 procedure NewBoard;
-function EvalWhite: Integer;
-function EvalBlack: Integer;
+function BoardToText(const B: TBoard): string;
+procedure TextToBoard(const S: string; var B: TBoard);
+procedure SideScores(out W, B: Integer);
 function Eval(Side: Integer): Integer;
 procedure CaptureMoves(Side: Integer; var Count: Integer; var List: TMoveList);
 procedure SimpleMoves(Side: Integer; var Count: Integer; var List: TSimpleList);
 procedure ApplyCapture(Side: Integer; const M: TMove);
-procedure ApplySimple(Side: Integer; const M: TSimpleMove);
+procedure ApplySimple(Side: Integer; const M: TSimpleMove); inline;
+procedure UndoSimple(const M: TSimpleMove; Piece: Integer); inline;
 function Search(Side, Depth: Integer): Integer;
 function FullSearch(Side, Depth: Integer): Integer;
+function PickRootMove(Side, Count, Best: Integer): Integer;
 function CapList(Side: Integer): PMoveList;
 function SimList(Side: Integer): PSimpleList;
 function RootValues(Side: Integer): PIntList;
@@ -256,66 +258,45 @@ begin
   Board := B;
 end;
 
-{ Оценка белых: шашка 10000 + 100 за горизонталь, +1 за каждое свободное поле впереди,
-  дамка 30000. В поддавках знак обратный. }
-function EvalWhite: Integer;
+const
+  { Буквы клеток в позиции строкой: 0 — '.', 1 — 'w', 2 — 'b', 11 — 'W', 12 — 'B'. }
+  CellChar: array[0..12] of Char = ('.', 'w', 'b', '?', '?', '?', '?', '?', '?', '?', '?',
+    'W', 'B');
+
+{ Позиция строкой: 32 символа .wbWB — горизонтали 1..8, в каждой тёмные поля слева направо.
+  Так позицию пишет журнал окна (/log) и читает игрок матча (verify/player). }
+function BoardToText(const B: TBoard): string;
 var
   i, j: Integer;
 begin
-  Result := 0;
-  for i := 1 to 8 do
-  begin
-    if i mod 2 = 0 then
-      j := 2
-    else
-      j := 1;
-    while j < 9 do
-    begin
-      if Board[i, j] = 1 then
-      begin
-        Result := Result + 10000 + j * 100;
-        if (i > 1) and (Board[i - 1, j + 1] = 0) then
-          Inc(Result);
-        if (i < 8) and (Board[i + 1, j + 1] = 0) then
-          Inc(Result);
-      end
-      else if Board[i, j] = 11 then
-        Result := Result + 30000;
-      Inc(j, 2);
-    end;
-  end;
-  if Poddavki = 1 then
-    Result := -Result;
+  Result := '';
+  for j := 1 to 8 do
+    for i := 1 to 8 do
+      if (i + j) mod 2 = 0 then
+        Result := Result + CellChar[B[i, j]];
 end;
 
-function EvalBlack: Integer;
+{ Позиция из строки BoardToText; другие буквы — пустые поля. }
+procedure TextToBoard(const S: string; var B: TBoard);
 var
-  i, j: Integer;
+  i, j, k: Integer;
 begin
-  Result := 0;
-  for i := 1 to 8 do
-  begin
-    if i mod 2 = 0 then
-      j := 2
-    else
-      j := 1;
-    while j < 9 do
+  k := 1;
+  for j := 1 to 8 do
+    for i := 1 to 8 do
     begin
-      if Board[i, j] = 2 then
+      B[i, j] := 0;
+      if (i + j) mod 2 = 0 then
       begin
-        Result := Result + 10900 - j * 100;
-        if (i > 1) and (Board[i - 1, j - 1] = 0) then
-          Inc(Result);
-        if (i < 8) and (Board[i + 1, j - 1] = 0) then
-          Inc(Result);
-      end
-      else if Board[i, j] = 12 then
-        Result := Result + 30000;
-      Inc(j, 2);
+        case S[k] of
+          'w': B[i, j] := 1;
+          'b': B[i, j] := 2;
+          'W': B[i, j] := 11;
+          'B': B[i, j] := 12;
+        end;
+        Inc(k);
+      end;
     end;
-  end;
-  if Poddavki = 1 then
-    Result := -Result;
 end;
 
 const
@@ -325,11 +306,12 @@ const
   EvBack = 300;
   EvCenter = 100;
 
-{ Разность оценок Side и соперника: EvalWhite и EvalBlack за один проход по доске, в обычной
-  игре — ещё охрана тыла и центр. }
-function Eval(Side: Integer): Integer;
+{ Слагаемые оценки за один проход по доске. W и B — фигуры белых и чёрных: шашка 10000 +
+  100 за каждую горизонталь от своего края (первая — 100), +1 за каждое свободное поле
+  впереди, дамка 30000. PW и PB — охрана тыла и центр. }
+procedure EvalParts(out W, B, PW, PB: Integer); inline;
 var
-  i, j, W, B, PW, PB: Integer;
+  i, j: Integer;
 begin
   W := 0;
   B := 0;
@@ -376,6 +358,29 @@ begin
       Inc(j, 2);
     end;
   end;
+end;
+
+{ Оценки белых (W) и чёрных (B) по отдельности — для полосок перевеса в окне: только фигуры,
+  в поддавках со знаком минус. }
+procedure SideScores(out W, B: Integer);
+var
+  PW, PB: Integer;
+begin
+  EvalParts(W, B, PW, PB);
+  if Poddavki = 1 then
+  begin
+    W := -W;
+    B := -B;
+  end;
+end;
+
+{ Оценка позиции для Side: разность её оценки и соперника, в обычной игре — с охраной тыла и
+  центром, в поддавках фигуры идут со знаком минус. }
+function Eval(Side: Integer): Integer;
+var
+  W, B, PW, PB: Integer;
+begin
+  EvalParts(W, B, PW, PB);
   if Poddavki = 1 then
   begin
     W := -W;
@@ -704,6 +709,14 @@ begin
   Board[M.FX, M.FY] := 0;
 end;
 
+{ Отменяет простой ход M; Piece — фигура, которая ходила (до превращения). Поле, куда шёл
+  простой ход, было пустым, поэтому копия всей доски не нужна. }
+procedure UndoSimple(const M: TSimpleMove; Piece: Integer);
+begin
+  Board[M.FX, M.FY] := Piece;
+  Board[M.TX, M.TY] := 0;
+end;
+
 { ---------- Перебор ---------- }
 
 const
@@ -799,12 +812,11 @@ end;
   доигрывания взятий. }
 function ReplyValue(Side, Depth: Integer): Integer;
 var
-  Opp, r, Saved, PRow, PKing: Integer;
+  Opp, r, Piece: Integer;
   Save2: TBoard;
+  Mv: TSimpleMove;
 begin
   Opp := 3 - Side;
-  PRow := PromoRow(Opp);
-  PKing := Opp + 10;
   CaptureMoves(Opp, CapCntD(Opp, Depth)^, CapListD(Opp, Depth)^);
   Result := Inf;
   for r := 1 to CapCntD(Opp, Depth)^ do
@@ -823,32 +835,27 @@ begin
     if (SimCntD(Opp, Depth)^ = 0) and (Poddavki = 1) then
       Result := -Inf;
     for r := 1 to SimCntD(Opp, Depth)^ do
-      with SimListD(Opp, Depth)^[r] do
-      begin
-        Saved := Board[FX, FY];
-        if TY = PRow then
-          Board[TX, TY] := PKing
-        else
-          Board[TX, TY] := Board[FX, FY];
-        Board[FX, FY] := 0;
-        if Depth = 1 then
-          Result := Min(Result, QMax(Side, -Inf - 1, Inf + 1, 1))
-        else
-          Result := Min(Result, FullSearch(Side, Depth - 1));
-        Board[FX, FY] := Saved;
-        Board[TX, TY] := 0;
-      end;
+    begin
+      Mv := SimListD(Opp, Depth)^[r];
+      Piece := Board[Mv.FX, Mv.FY];
+      ApplySimple(Opp, Mv);
+      if Depth = 1 then
+        Result := Min(Result, QMax(Side, -Inf - 1, Inf + 1, 1))
+      else
+        Result := Min(Result, FullSearch(Side, Depth - 1));
+      UndoSimple(Mv, Piece);
+    end;
   end;
 end;
 
 { Полный перебор без отсечений: лучшая для Side оценка на Depth полных ходов вперёд. Эталон
   для проверки альфа-беты (verify/abcheck). На корне (Depth = уровень стороны) оценки ходов
-  сохраняются в RootValues[Side]. }
+  пишутся в RootValues[Side]; у вложенных узлов Depth меньше, и туда они не пишут. }
 function FullSearch(Side, Depth: Integer): Integer;
 var
-  m, V: Integer;
+  m, V, Piece: Integer;
   Save1: TBoard;
-  Values: array[1..400] of Integer;
+  Mv: TSimpleMove;
 begin
   Result := -Inf;
   SearchPoll;
@@ -862,7 +869,7 @@ begin
       ApplyCapture(Side, CapListD(Side, Depth)^[m]);
       V := ReplyValue(Side, Depth);
       if Depth = Level(Side) then
-        Values[m] := V;
+        RootValues(Side)^[m] := V;
       Result := Max(Result, V);
       CopyBoard(Board, Save1);
     end
@@ -873,18 +880,16 @@ begin
       Result := Inf;
     for m := 1 to SimCntD(Side, Depth)^ do
     begin
-      CopyBoard(Save1, Board);
-      ApplySimple(Side, SimListD(Side, Depth)^[m]);
+      Mv := SimListD(Side, Depth)^[m];
+      Piece := Board[Mv.FX, Mv.FY];
+      ApplySimple(Side, Mv);
       V := ReplyValue(Side, Depth);
       if Depth = Level(Side) then
-        Values[m] := V;
+        RootValues(Side)^[m] := V;
       Result := Max(Result, V);
-      CopyBoard(Board, Save1);
+      UndoSimple(Mv, Piece);
     end;
   end;
-  if Depth = Level(Side) then
-    for m := 1 to ListCap do
-      RootValues(Side)^[m] := Values[m];
 end;
 
 { ---------- Альфа-бета ---------- }
@@ -1129,10 +1134,10 @@ function ABMax(Side, Depth, Alpha, Beta: Integer): Integer; forward;
 { Худший для Side ответ соперника с отсечением по окну (Alpha, Beta). }
 function ABReply(Side, Depth, Alpha, Beta: Integer): Integer;
 var
-  Opp, r, Saved, V, Alpha0, Beta0: Integer;
+  Opp, r, Piece, V, Alpha0, Beta0: Integer;
   Save2: TBoard;
   Key: QWord;
-  First, Best: TSimpleMove;
+  First, Best, Mv: TSimpleMove;
 begin
   Key := BoardKey xor ZReply;
   if TTProbe(Key, Depth, Alpha, Beta, V, First) then
@@ -1169,28 +1174,21 @@ begin
     for r := 1 to SimCntD(Opp, Depth)^ do
     begin
       PickMove(SimListD(Opp, Depth)^, True, Depth, r, SimCntD(Opp, Depth)^);
-      with SimListD(Opp, Depth)^[r] do
-      begin
-        Saved := Board[FX, FY];
-        if TY = PromoRow(Opp) then
-          Board[TX, TY] := Opp + 10
-        else
-          Board[TX, TY] := Board[FX, FY];
-        Board[FX, FY] := 0;
-        if Depth = 1 then
-          V := QMax(Side, Alpha, Beta, 1)
-        else
-          V := ABMax(Side, Depth - 1, Alpha, Beta);
-        Board[FX, FY] := Saved;
-        Board[TX, TY] := 0;
-      end;
+      Mv := SimListD(Opp, Depth)^[r];
+      Piece := Board[Mv.FX, Mv.FY];
+      ApplySimple(Opp, Mv);
+      if Depth = 1 then
+        V := QMax(Side, Alpha, Beta, 1)
+      else
+        V := ABMax(Side, Depth - 1, Alpha, Beta);
+      UndoSimple(Mv, Piece);
       if (r = 1) or (V < Result) then
-        Best := SimListD(Opp, Depth)^[r];
+        Best := Mv;
       Result := Min(Result, V);
       Beta := Min(Beta, Result);
       if Alpha >= Beta then
       begin
-        StoreCutoff(SimListD(Opp, Depth)^[r], Opp, True, Depth);
+        StoreCutoff(Mv, Opp, True, Depth);
         Break;
       end;
     end;
@@ -1201,10 +1199,10 @@ end;
 { Лучший для Side ход с отсечением по окну (Alpha, Beta). }
 function ABMax(Side, Depth, Alpha, Beta: Integer): Integer;
 var
-  m, V, Alpha0, Beta0: Integer;
+  m, V, Piece, Alpha0, Beta0: Integer;
   Save1: TBoard;
   Key: QWord;
-  First, Best: TSimpleMove;
+  First, Best, Mv: TSimpleMove;
 begin
   Result := -Inf;
   SearchPoll;
@@ -1240,17 +1238,18 @@ begin
     for m := 1 to SimCntD(Side, Depth)^ do
     begin
       PickMove(SimListD(Side, Depth)^, False, Depth, m, SimCntD(Side, Depth)^);
-      CopyBoard(Save1, Board);
-      ApplySimple(Side, SimListD(Side, Depth)^[m]);
+      Mv := SimListD(Side, Depth)^[m];
+      Piece := Board[Mv.FX, Mv.FY];
+      ApplySimple(Side, Mv);
       V := ABReply(Side, Depth, Alpha, Beta);
-      CopyBoard(Board, Save1);
+      UndoSimple(Mv, Piece);
       if (m = 1) or (V > Result) then
-        Best := SimListD(Side, Depth)^[m];
+        Best := Mv;
       Result := Max(Result, V);
       Alpha := Max(Alpha, Result);
       if Alpha >= Beta then
       begin
-        StoreCutoff(SimListD(Side, Depth)^[m], Side, False, Depth);
+        StoreCutoff(Mv, Side, False, Depth);
         Break;
       end;
     end;
@@ -1335,6 +1334,26 @@ function Search(Side, Depth: Integer): Integer;
 begin
   IdleLeft := 1;  // сообщения обрабатываются уже в корне
   Result := ABRoot(Side, Depth);
+end;
+
+{ Ход компьютера после Search с итогом Best: номер случайного хода среди Count ходов корня с
+  оценкой Best (в CapList или SimList стороны). Не нашлось ни одного — первый ход. }
+function PickRootMove(Side, Count, Best: Integer): Integer;
+var
+  i, n: Integer;
+  Cand: TIntList;
+begin
+  n := 0;
+  for i := 1 to Count do
+    if RootValues(Side)^[i] = Best then
+    begin
+      Inc(n);
+      Cand[n] := i;
+    end;
+  if n = 0 then
+    Result := 1
+  else
+    Result := Cand[DRandom(n) + 1];
 end;
 
 initialization
