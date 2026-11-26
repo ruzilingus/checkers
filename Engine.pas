@@ -85,12 +85,12 @@ procedure DRandomize;
 function DRandom(Range: Integer): Integer;
 function PromoRow(Side: Integer): Integer; inline;
 function Level(Side: Integer): Integer;
-procedure CopyBoard(var Dst: TBoard; const Src: TBoard);
+procedure CopyBoard(out Dst: TBoard; const Src: TBoard);
 function BoardsEqual(const A, B: TBoard): Boolean;
-procedure InitBoard(var B: TBoard);
+procedure InitBoard(out B: TBoard);
 procedure NewBoard;
 function BoardToText(const B: TBoard): string;
-procedure TextToBoard(const S: string; var B: TBoard);
+procedure TextToBoard(const S: string; out B: TBoard);
 procedure SideScores(const Bd: TBoard; out W, B: Integer);
 function Eval(Side: Integer): Integer;
 procedure CaptureMoves(Side: Integer; var Count: Integer; var List: TMoveList);
@@ -145,7 +145,7 @@ end;
 
 { Копирует доску целиком: одно присваивание быстрее обхода тёмных полей, а светлые поля
   всегда пусты. }
-procedure CopyBoard(var Dst: TBoard; const Src: TBoard);
+procedure CopyBoard(out Dst: TBoard; const Src: TBoard);
 begin
   Dst := Src;
 end;
@@ -169,7 +169,7 @@ begin
   end;
 end;
 
-procedure InitBoard(var B: TBoard);
+procedure InitBoard(out B: TBoard);
 var
   i, j: Integer;
 begin
@@ -213,7 +213,7 @@ begin
 end;
 
 { Позиция из строки BoardToText; другие буквы — пустые поля. }
-procedure TextToBoard(const S: string; var B: TBoard);
+procedure TextToBoard(const S: string; out B: TBoard);
 var
   i, j, k: Integer;
 begin
@@ -901,8 +901,8 @@ end;
 
 { Ищет узел Key в таблице. Move — лучший простой ход из записи (MFX = 0 — нет). True, если
   запись той же глубины решает узел при окне (Alpha, Beta); тогда её оценка — в V. }
-function TTProbe(Key: QWord; Depth, Alpha, Beta: Integer; var V: Integer;
-  var Move: TSimpleMove): Boolean;
+function TTProbe(Key: QWord; Depth, Alpha, Beta: Integer; out V: Integer;
+  out Move: TSimpleMove): Boolean;
 var
   E: PTransEntry;
 begin

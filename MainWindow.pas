@@ -644,7 +644,7 @@ end;
 
 { Можно ли отметить поле (X, Y) очередным (AStep-м) полем хода стороны Side. Index — номер
   хода в списке, Final — ход этим полем завершён. }
-function CheckStep(Side, X, Y, AStep: Integer; var Index: Integer; var Final: Boolean): Boolean;
+function CheckStep(Side, X, Y, AStep: Integer; out Index: Integer; out Final: Boolean): Boolean;
 var
   i, k: Integer;
 begin
