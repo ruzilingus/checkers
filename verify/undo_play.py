@@ -16,11 +16,9 @@ import subprocess
 import sys
 import time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-gp_src = open(os.path.join(HERE, "gui_play.py"), encoding="utf-8").read().replace("\nmain()\n", "\n")
-gp = {}
-exec(compile(gp_src, "gui_play", "exec"), gp)
-user32 = gp["user32"]
+import gui_play as gp  # лежит рядом: папка скрипта входит в путь поиска модулей
+
+user32 = gp.user32
 
 WM_SYSKEYDOWN, WM_SYSKEYUP, VK_BACK = 0x0104, 0x0105, 0x08
 
@@ -51,35 +49,36 @@ def main():
     log = os.path.abspath(out + ".log")
     if os.path.exists(log):
         os.remove(log)
-    human = gp["HUMAN_SIDE"][mode]
+    human = gp.HUMAN_SIDE[mode]
     game = subprocess.Popen([os.path.abspath(exe), "/fixedseed", "/log=" + log])
     pl = subprocess.Popen([os.path.abspath(player)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                           text=True)
     rng = random.Random(5)
     try:
         time.sleep(3)
-        wins = [h for h in gp["windows_of"](game.pid) if gp["class_name"](h) != "#32770"]
-        main_wnd = max(wins, key=lambda h: gp["size"](h)[0] * gp["size"](h)[1])
-        panel = max(gp["children"](main_wnd), key=lambda h: gp["size"](h)[0] * gp["size"](h)[1])
-        board = next(h for h in gp["children"](panel) if gp["size"](h) == (402, 402))
-        gp["click"](panel, *gp["MODE_BUTTON"][mode])
+        wins = [h for h in gp.windows_of(game.pid) if gp.class_name(h) != "#32770"]
+        main_wnd = max(wins, key=lambda h: gp.size(h)[0] * gp.size(h)[1])
+        panel = max(gp.children(main_wnd), key=lambda h: gp.size(h)[0] * gp.size(h)[1])
+        board = next(h for h in gp.children(panel) if gp.size(h) == (402, 402))
+        gp.click(panel, *gp.MODE_BUTTON[mode])
         wait_stable(log)
         for act in script:
             if act == "m":
-                _, pos = gp["positions"](log)[-1]
+                _, pos = gp.positions(log)[-1]
                 pl.stdin.write(f"list {human} {pos}\n")
                 pl.stdin.flush()
                 move = rng.choice(pl.stdout.readline().split())
                 for sq in move.split("-"):
-                    gp["click"](board, *gp["square_point"](int(sq[0]), int(sq[1]), human == 2))
+                    gp.click(board, *gp.square_point(int(sq[0]), int(sq[1]), human == 2))
                     time.sleep(0.15)
             else:
                 alt_backspace(main_wnd)
             wait_stable(log)
-            print(act, "->", [k for k, _ in gp["positions"](log)][-6:])
+            print(act, "->", [k for k, _ in gp.positions(log)][-6:])
     finally:
         game.kill()
         pl.kill()
 
 
-main()
+if __name__ == "__main__":
+    main()

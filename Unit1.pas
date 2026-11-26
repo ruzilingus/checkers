@@ -38,15 +38,15 @@ type
     TitleImage: TImage;
     IconImage: TImage;
     ScoreBackImage: TImage;
-    Smile1: TImage;
-    Smile2: TImage;
+    PoddavkiOnGlyph: TImage;
+    PoddavkiOffGlyph: TImage;
     LightSquare: TImage;
     DarkSquare: TImage;
     Select: TImage;
     WhiteFish: TImage;
     BlackFish: TImage;
-    WhiteFish2: TImage;
-    BlackFish2: TImage;
+    WhiteKingFish: TImage;
+    BlackKingFish: TImage;
     AutoModeBevel: TBevel;
     WhiteModeBevel: TBevel;
     BlackModeBevel: TBevel;
@@ -326,8 +326,8 @@ begin
   case V of
     1: Result := Form1.WhiteFish;
     2: Result := Form1.BlackFish;
-    11: Result := Form1.WhiteFish2;
-    12: Result := Form1.BlackFish2;
+    11: Result := Form1.WhiteKingFish;
+    12: Result := Form1.BlackKingFish;
   else
     Result := nil;
   end;
@@ -853,7 +853,7 @@ begin
         LightSquare.Picture.Graphic);
   IconImage.Picture.Bitmap := AboutButton.Glyph;
   WhiteModeButton.Glyph := BlackModeButton.Glyph;
-  PoddavkiButton.Glyph := Smile2.Picture.Bitmap;
+  PoddavkiButton.Glyph := PoddavkiOffGlyph.Picture.Bitmap;
   Form2.FormShow(Sender);
   Form2.OkButtonClick(Sender);
   CreateBlinkFish;
@@ -882,7 +882,7 @@ var
     Result.Width := 9;
     Result.Height := AHeight;
     Result.BevelOuter := bvNone;
-    Result.Color := Smile1.Canvas.Pixels[1, 1];
+    Result.Color := PoddavkiOnGlyph.Canvas.Pixels[1, 1];  // угловая точка значка — цвет фона окна
     Result.Font.Name := 'MS Sans Serif';  // шрифт по умолчанию в Delphi 5
     Result.Font.Size := 12;
     Result.Font.Style := [fsBold];
@@ -1226,7 +1226,7 @@ begin
     PoddavkiButton.Hint := 'Поддавки Ctrl+G';
     Application.Title := 'Шашки';
     Title.Caption := 'Шашки';
-    PoddavkiButton.Glyph := Smile2.Picture.Bitmap;
+    PoddavkiButton.Glyph := PoddavkiOffGlyph.Picture.Bitmap;
   end
   else if Poddavki = 0 then
   begin
@@ -1234,7 +1234,7 @@ begin
     PoddavkiButton.Hint := 'Шашки Ctrl+G';
     Application.Title := 'Поддавки';
     Title.Caption := 'Поддавки';
-    PoddavkiButton.Glyph := Smile1.Picture.Bitmap;
+    PoddavkiButton.Glyph := PoddavkiOnGlyph.Picture.Bitmap;
   end;
   NewBoard;
   DrawBoard;

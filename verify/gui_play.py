@@ -203,4 +203,5 @@ def main():
     print(f"{mode}: {len(pos)} positions, {games} game starts, {len(messages)} messages")
 
 
-main()
+if __name__ == "__main__":
+    main()

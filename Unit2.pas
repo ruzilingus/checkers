@@ -194,8 +194,8 @@ begin
   Form1.WhiteFish.Picture := WhitePreview.Picture;
   Form1.BlackFish.Picture := BlackPreview.Picture;
   Recolor(KingTemplate);
-  Form1.WhiteFish2.Picture := WhitePreview.Picture;
-  Form1.BlackFish2.Picture := BlackPreview.Picture;
+  Form1.WhiteKingFish.Picture := WhitePreview.Picture;
+  Form1.BlackKingFish.Picture := BlackPreview.Picture;
   OkPressed := True;
   Close;
 end;

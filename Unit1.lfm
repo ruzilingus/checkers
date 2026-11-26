@@ -976,7 +976,7 @@ object Form1: TForm1
         Transparent = True
         Visible = False
       end
-      object WhiteFish2: TImage
+      object WhiteKingFish: TImage
         Left = 288
         Top = 8
         Width = 50
@@ -984,7 +984,7 @@ object Form1: TForm1
         Transparent = True
         Visible = False
       end
-      object BlackFish2: TImage
+      object BlackKingFish: TImage
         Left = 344
         Top = 8
         Width = 50
@@ -993,7 +993,7 @@ object Form1: TForm1
         Transparent = True
         Visible = False
       end
-      object Smile1: TImage
+      object PoddavkiOnGlyph: TImage
         Left = 32
         Top = 88
         Width = 36
@@ -1067,7 +1067,7 @@ object Form1: TForm1
         Transparent = True
         Visible = False
       end
-      object Smile2: TImage
+      object PoddavkiOffGlyph: TImage
         Left = 72
         Top = 88
         Width = 36
