@@ -1284,6 +1284,8 @@ begin
   end;
 end;
 
+{ Переключает поддавки и обычную игру: подсказка и значок кнопки, заголовок окна и программы;
+  затем новая партия, первыми ходят белые (LastMover = 2). }
 procedure TMainForm.PoddavkiButtonClick(Sender: TObject);
 begin
   LastMover := 2;
