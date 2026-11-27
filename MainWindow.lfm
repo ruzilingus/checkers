@@ -1246,6 +1246,10 @@ object MainForm: TMainForm
       Caption = 'Уровень 7'
       OnClick = WhiteLevelClick
     end
+    object WhiteLevel8: TMenuItem
+      Caption = 'Уровень 8'
+      OnClick = WhiteLevelClick
+    end
   end
   object BlackPopup: TPopupMenu
     Left = 202
@@ -1277,6 +1281,10 @@ object MainForm: TMainForm
     end
     object BlackLevel7: TMenuItem
       Caption = 'Уровень 7'
+      OnClick = BlackLevelClick
+    end
+    object BlackLevel8: TMenuItem
+      Caption = 'Уровень 8'
       OnClick = BlackLevelClick
     end
   end

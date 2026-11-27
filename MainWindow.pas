@@ -80,6 +80,7 @@ type
     WhiteLevel5: TMenuItem;
     WhiteLevel6: TMenuItem;
     WhiteLevel7: TMenuItem;
+    WhiteLevel8: TMenuItem;
     BlackLevel1: TMenuItem;
     BlackLevel2: TMenuItem;
     BlackLevel3: TMenuItem;
@@ -87,6 +88,7 @@ type
     BlackLevel5: TMenuItem;
     BlackLevel6: TMenuItem;
     BlackLevel7: TMenuItem;
+    BlackLevel8: TMenuItem;
     SoundBevel: TBevel;
     SoundButton: TSpeedButton;
     procedure FormActivate(Sender: TObject);
